@@ -3,6 +3,7 @@ from unittest import result
 import settings
 import requests
 import json
+import re
 import os
 # parameters from .ini file
 # date support
@@ -228,6 +229,7 @@ def set_status_to_sent(sysid):
         print(msg)
         print(response.json())
 
+
 #waiting to oz for switch
 def send_commands_to_switch(ip, command):
     """
@@ -284,6 +286,20 @@ def send_commands_to_switch(ip, command):
         print(output)
     # Close connection.
     ssh.close()
+
+# def get_interface_vlan_status(ipAddress):
+#     try:
+#         session = paramiko.SSHClient()
+#         session.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+#         session.connect(ipAddress,username=shapi,password=patish,allow_agent=False,look_for_keys=False, timeout=300)
+#         # SCPCLient takes a paramiko transport as an argument
+#         connection=session.invoke_shell()
+#
+#         connection.send("show int gig0/1 switchport".encode('ascii') + b"\n")
+#     except paramiko.AuthenticationException as e :
+#         print(e)
+
+
 
 #working
 def today():
@@ -347,25 +363,67 @@ def parse_and_send_command(ip, command):
     return response
 
 def run():
-   number_of_runs = 1
-   for x in range(number_of_runs):
-    print(get_ips_from_snow())
-    for ip in settings.ips:
-     print('current ip is: ' + ip.strip())
-     commands = get_commands_from_snow(ip=ip.strip())
-     if type(commands) is str:
-         response = parse_and_send_command(ip,commands)
-     else:
-        for command in commands:
-         response = parse_and_send_command(ip,command)
-   else:
-    print("Finally finished!")
+   # number_of_runs = 1
+   # for x in range(number_of_runs):
+   #  print(get_ips_from_snow())
+   #  for ip in settings.ips:
+   #   print('current ip is: ' + ip.strip())
+   #   commands = get_commands_from_snow(ip=ip.strip())
+   #   if type(commands) is str:
+   #       response = parse_and_send_command(ip,commands)
+   #   else:
+   #      for command in commands:
+   #       response = parse_and_send_command(ip,command)
+   # else:
+   #  print("Finally finished!")
     
    #get_commands_from_snow(hostname='YanirServer')
    #get_ips_from_snow()
    #send_json_to_snow()
    #set_status_to_sent('f49bffa3878b9d505db3db1cbbbb351e')
-    #send_commands_to_switch(ip="10.10.20.48", command="hostname yanir")
+   #send_commands_to_switch(ip="10.10.20.48", command="hostname yanir")
+
+   # def get_interface_vlan_status(ip_address, username, password, command, sshClient=None):
+   #     try:
+   #         session = paramiko.SSHClient()
+   #         session.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+   #         session.connect(ipAddress,username=shapi,password=patish,allow_agent=False,look_for_keys=False, timeout=300)
+   #         # SCPCLient takes a paramiko transport as an argument
+   #         connection=session.invoke_shell()
+   #
+   #         connection.send("show int gig0/1 switchport".encode('ascii') + b"\n")
+   #     except paramiko.AuthenticationException as e :
+   #         print(e)
+
+
+   ssh = paramiko.SSHClient()
+   ssh.load_system_host_keys()
+   # Add SSH host key when missing.
+   ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+
+   ports = run_command_on_device_wo_close('192.168.88.27', 'nandi', 'iolredi8', 'show int switchport | include Name', ssh)
+   for port in ports:
+       port_no = port.split()[1]
+       if port_no == "Gi0/3":
+           continue
+       command = "show int " + port_no + " switchport"
+       print(port_no)
+       response = run_command_on_device_wo_close('192.168.88.27', 'nandi', 'iolredi8',
+                                                 command, ssh)[2]
+       port_mode = str(response.replace("\n","").replace("Administrative Mode: ",""))
+       print(port_mode)
+       if "dynamic auto" in port_mode:
+           print("change")
+           run_command_on_device_wo_close('192.168.88.27', 'nandi', 'iolredi8',
+                                          'enable', ssh)
+           run_command_on_device_wo_close('192.168.88.27', 'nandi', 'iolredi8',
+                                          'cisco', ssh)
+           run_command_on_device_wo_close('192.168.88.27', 'nandi', 'iolredi8',
+                                          'disable', ssh)
+   ssh.close()
+
+
 
 
 if __name__ == "__main__":
