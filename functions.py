@@ -1,4 +1,5 @@
 import time
+import sys
 import threading
 NULL = 0
 from unittest import result
@@ -27,16 +28,19 @@ class ssh_new:
         self.client = paramiko.SSHClient()
         self.client.set_missing_host_key_policy(paramiko.client.AutoAddPolicy())
         self.client.connect(address, username=username, password=password, look_for_keys=False)
-        self.transport = paramiko.Transport((address, 22))
-        self.transport.connect(username=username, password=password)
 
     def close_connection(self):
         if(self.client != None):
             self.client.close()
-            self.transport.close()
 
     def open_shell(self):
         self.shell = self.client.invoke_shell()
+
+
+    def exec_command(self, command):
+        _, ssh_stdout, ssh_stderr = self.client.exec_command(command)
+        err = ssh_stderr.readlines()
+        return err if err else ssh_stdout.readlines()
 
     def send_shell(self, command):
         if(self.shell):
@@ -416,16 +420,44 @@ def get_all_interfaces(ip_address, username, password, sshClient=None):
         interfaces[idx] = interface.split()[1]
     return interfaces
 
+
+def check_vlan_exists(ip_address, username, password, vlan_id, sshClient=None):
+    response = run_command_on_device_wo_close(ip_address, username, password, f'show vlan id {vlan_id}', sshClient)[1]
+    if "not found in current VLAN database" in response:
+        return False
+    return True
+
+def check_privileged_connection(connection):
+    buffer_size = 4096
+    def flush(connection):
+        while connection.shell.recv_ready():
+            connection.shell.recv(buffer_size)
+    def get_prompt(connection):
+        flush(connection)  # flush everything from before
+        connection.shell.sendall('\n')
+
+        time.sleep(.3)
+        data = str(connection.shell.recv(buffer_size), encoding='utf-8').strip()
+        flush(connection)  # flush everything after (just in case)
+
+        return data
+    prompt = get_prompt(connection)
+    return True if prompt[-1] == '#' else False
+
+
 def change_interface_mode(ip_address, username, password, interface, mode, vlan_id=1, enable_pass=None):
     connection = ssh_new(ip_address, username, password)
     connection.open_shell()
     time.sleep(1)
 
-    if enable_pass is not None:
-        connection.send_shell('enable')
-        time.sleep(1)
-        connection.send_shell(enable_pass)
-        time.sleep(1)
+    if not check_privileged_connection(connection):
+        if enable_pass is not None:
+            connection.send_shell('enable')
+            time.sleep(1)
+            connection.send_shell(enable_pass)
+            time.sleep(1)
+        else:
+            raise ValueError(f'enable_pass is missing and SSH connection is not privileged')
 
     connection.send_shell('conf terminal')
     time.sleep(1)
@@ -436,10 +468,16 @@ def change_interface_mode(ip_address, username, password, interface, mode, vlan_
         connection.send_shell('switchport mode trunk')
         time.sleep(1)
         connection.send_shell('switchport trunk encapsulation dot1q')
+        print(f'interface {interface} mode changed to trunk')
     elif mode == 'access':
         connection.send_shell('switchport mode access')
+        print(f'Interface {interface} mode changed to access')
     elif mode == 'vlan':
+        if check_vlan_exists(ip_address, username, password, vlan_id) == False:
+            raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
+
         connection.send_shell(f'switchport access vlan {vlan_id}')
+        print(f'Interface {interface} added to VLAN {vlan_id}')
     time.sleep(1)
     connection.close_connection()
 
@@ -483,10 +521,11 @@ def run():
    # Add SSH host key when missing.
    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-   change_interface_mode('192.168.88.27', 'shapi', 'patish', 'Gi0/9', 'vlan', 63)
+   #print(check_vlan_exists('192.168.88.27', 'shapi', 'patish', 3, ssh))
+   change_interface_mode('192.168.88.27', 'nandi', 'iolredi8', 'Gi0/9', 'vlan', 2)
    # interfaces = get_all_interfaces('192.168.88.27', 'shapi', 'patish', ssh)
-   interfaces_mode = get_interfaces_mode('192.168.88.27', 'shapi', 'patish', ['Gi0/9'], ssh)
-   print(interfaces_mode)
+   #interfaces_mode = get_interfaces_mode('192.168.88.27', 'shapi', 'patish', ['Gi0/9'], ssh)
+   #print(interfaces_mode)
 
    # for interface_mode in interfaces_mode:
    #     if interface_mode['mode'] == 'dynamic auto' and interface_mode['interface'] != :
@@ -516,4 +555,8 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    try:
+        run()
+    except Exception as err:
+        print(f'{type(err)}: {err}')
+
