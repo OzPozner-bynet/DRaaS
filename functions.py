@@ -1,3 +1,5 @@
+import time
+import threading
 NULL = 0
 from unittest import result
 import settings
@@ -13,6 +15,35 @@ import paramiko
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+class ssh_new:
+    shell = None
+    client = None
+    transport = None
+
+    def __init__(self, address, username, password):
+        print("Connecting to server on ip", str(address) + ".")
+        self.client = paramiko.SSHClient()
+        self.client.set_missing_host_key_policy(paramiko.client.AutoAddPolicy())
+        self.client.connect(address, username=username, password=password, look_for_keys=False)
+        self.transport = paramiko.Transport((address, 22))
+        self.transport.connect(username=username, password=password)
+
+    def close_connection(self):
+        if(self.client != None):
+            self.client.close()
+            self.transport.close()
+
+    def open_shell(self):
+        self.shell = self.client.invoke_shell()
+
+    def send_shell(self, command):
+        if(self.shell):
+            return self.shell.send(command + "\n")
+        else:
+            print("Shell not opened.")
+
 
 def run_command_on_device_wo_close(ip_address, username, password, command, sshClient=None):
     """ Connect to a device, run a command, and return the output."""
@@ -353,6 +384,8 @@ def parse_and_send_command(ip, command):
           #data_json = {"hello": "world"}
         payload = {'json_payload': json}
         #send_json_to_snow(payload) 
+        #send_json_to_snow(payload)
+        response = send_json_to_snow(payload)
         response = send_json_to_snow(payload)
       case "pattern-2":
         response = send_commands_to_switch(ip = ip, command = command)
@@ -361,6 +394,55 @@ def parse_and_send_command(ip, command):
       case _:
         response = send_commands_to_switch(ip = ip, command = command)
     return response
+
+def get_interfaces_mode(ip_address, username, password, interfaces, sshClient=None):
+    interfaces_mode = []
+    for interface in interfaces:
+        command = "show int " + interface + " switchport | include Administrative Mode:"
+        response = run_command_on_device_wo_close(ip_address, username, password,
+                                                  command, sshClient)[0]
+        interface_mode = str(response.replace("\n", "").replace("\r", "").replace("Administrative Mode: ", ""))
+        interface_mode = {
+            'interface': interface,
+            'mode': interface_mode
+        }
+        interfaces_mode.append(interface_mode)
+    return interfaces_mode
+
+def get_all_interfaces(ip_address, username, password, sshClient=None):
+    interfaces = run_command_on_device_wo_close(ip_address, username, password, 'show int switchport | include Name',
+                                           sshClient)
+    for idx, interface in enumerate(interfaces):
+        interfaces[idx] = interface.split()[1]
+    return interfaces
+
+def change_interface_mode(ip_address, username, password, interface, mode, vlan_id=1, enable_pass=None):
+    connection = ssh_new(ip_address, username, password)
+    connection.open_shell()
+    time.sleep(1)
+
+    if enable_pass is not None:
+        connection.send_shell('enable')
+        time.sleep(1)
+        connection.send_shell(enable_pass)
+        time.sleep(1)
+
+    connection.send_shell('conf terminal')
+    time.sleep(1)
+    connection.send_shell(f'interface {interface}')
+    time.sleep(1)
+
+    if mode == 'trunk':
+        connection.send_shell('switchport mode trunk')
+        time.sleep(1)
+        connection.send_shell('switchport trunk encapsulation dot1q')
+    elif mode == 'access':
+        connection.send_shell('switchport mode access')
+    elif mode == 'vlan':
+        connection.send_shell(f'switchport access vlan {vlan_id}')
+    time.sleep(1)
+    connection.close_connection()
+
 
 def run():
    # number_of_runs = 1
@@ -401,26 +483,33 @@ def run():
    # Add SSH host key when missing.
    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
+   change_interface_mode('192.168.88.27', 'shapi', 'patish', 'Gi0/9', 'vlan', 63)
+   # interfaces = get_all_interfaces('192.168.88.27', 'shapi', 'patish', ssh)
+   interfaces_mode = get_interfaces_mode('192.168.88.27', 'shapi', 'patish', ['Gi0/9'], ssh)
+   print(interfaces_mode)
 
-   ports = run_command_on_device_wo_close('192.168.88.27', 'nandi', 'iolredi8', 'show int switchport | include Name', ssh)
-   for port in ports:
-       port_no = port.split()[1]
-       if port_no == "Gi0/3":
-           continue
-       command = "show int " + port_no + " switchport"
-       print(port_no)
-       response = run_command_on_device_wo_close('192.168.88.27', 'nandi', 'iolredi8',
-                                                 command, ssh)[2]
-       port_mode = str(response.replace("\n","").replace("Administrative Mode: ",""))
-       print(port_mode)
-       if "dynamic auto" in port_mode:
-           print("change")
-           run_command_on_device_wo_close('192.168.88.27', 'nandi', 'iolredi8',
-                                          'enable', ssh)
-           run_command_on_device_wo_close('192.168.88.27', 'nandi', 'iolredi8',
-                                          'cisco', ssh)
-           run_command_on_device_wo_close('192.168.88.27', 'nandi', 'iolredi8',
-                                          'disable', ssh)
+   # for interface_mode in interfaces_mode:
+   #     if interface_mode['mode'] == 'dynamic auto' and interface_mode['interface'] != :
+   #         print(f"I will change {interface_mode['interface']} to trunk")
+
+   # for port in ports:
+   #     if port == "Gi0/3":
+   #         continue
+   #     command = "show int " + port + " switchport"
+   #     print(port)
+   #     response = run_command_on_device_wo_close('192.168.88.27', 'nandi', 'iolredi8',
+   #                                               command, ssh)[2]
+   #     port_mode = str(response.replace("\n","").replace("Administrative Mode: ",""))
+   #     print(port_mode)
+   #     if "dynamic auto" in port_mode:
+   #         print("change")
+   #         command = """enable
+   #         cisco
+   #         disable
+   #         """
+   #         run_command_on_device_wo_close('192.168.88.27', 'nandi', 'iolredi8',
+   #                                        command, ssh)
+   #         time.sleep(1)
    ssh.close()
 
 
