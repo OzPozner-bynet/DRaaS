@@ -6,3 +6,4 @@
 .vs/
 env/
 venv/
+.venv/
