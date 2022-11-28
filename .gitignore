@@ -5,5 +5,4 @@
 *.env
 .vs/
 env/
-.venv/
 venv/
