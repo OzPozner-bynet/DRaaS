@@ -213,7 +213,7 @@ def get_ips_from_snow():
     """
     This function gets list of switchs ips from snow API
     """
-    commandsUrl = settings.url + 'api/bdml/parse_switch_json/SwitchIPs'
+    commandsUrl = settings.url + 'SwitchIPs'
     #
 
     response = requests.get(commandsUrl, headers={
@@ -234,18 +234,26 @@ def get_ips_from_snow():
           print(str(response))
     if (response.status_code == 200 | response.status_code == 201):
       if(myresponse):
-        myjson = json.loads(str(response.content)[2:-1])
-        settings.ips = myjson["result"]["ips"]
-        print(settings.ips)
+        # myjson = json.loads(str(response.content)[2:-1])
+        jsonResponse = json.loads(str(response.content)[2:-1])
+        print(jsonResponse)
+        print("##########")
+        print(jsonResponse["result"])
+        for each in jsonResponse["result"]:
+           print(each['ip'])
+           print(each['username'])
+           print(each['password'])
+        # settings.ips = myjson["result"]["ips"]
+        # print(settings.ips)
       else:
           return 'error bad payload'
     else:
         return 'bad response from snow code:' + str(response.status_code) + ' message: ' + str(myresponse)
-    #switch_username = myresponse["result"]["username"]
-    #switch_password = myresponse["result"]["password"]
-    #print(switch_username)
-    #print(switch_password)
-
+#    switch_username = myresponse["result"]["username"]
+#    switch_password = myresponse["result"]["password"]
+#    print(switch_username)
+#    print(switch_password)
+#
 
 def set_status_to_sent(sysid):
     """
