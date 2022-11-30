@@ -498,7 +498,7 @@ def run():
    #  print("Finally finished!")
     
    #get_commands_from_snow(hostname='YanirServer')
-   #get_ips_from_snow()
+   get_ips_from_snow()
    #send_json_to_snow()
    #set_status_to_sent('f49bffa3878b9d505db3db1cbbbb351e')
    #send_commands_to_switch(ip="10.10.20.48", command="hostname yanir")
@@ -522,7 +522,7 @@ def run():
    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
    #print(check_vlan_exists('192.168.88.27', 'shapi', 'patish', 3, ssh))
-   change_interface_mode('192.168.88.27', 'nandi', 'iolredi8', 'Gi0/9', 'vlan', 2)
+   change_interface_mode('192.168.88.27', 'nandi', 'iolredi8', 'Gi0/9', 'access', 2, 'cisco')
    # interfaces = get_all_interfaces('192.168.88.27', 'shapi', 'patish', ssh)
    #interfaces_mode = get_interfaces_mode('192.168.88.27', 'shapi', 'patish', ['Gi0/9'], ssh)
    #print(interfaces_mode)
