@@ -163,7 +163,7 @@ def get_commands_from_snow(hostname=None, ip=None):
     """
     This function gets commands from snow API
     """
-    commandsUrl = settings.url + "api/bdml/parse_switch_json/GETCommands"
+    commandsUrl = settings.url + "GETCommands"
     if (ip != None):
         myparams = {"switch_ip": str(ip)}
     if (hostname != None):
@@ -505,7 +505,7 @@ def run():
    # else:
    #  print("Finally finished!")
     
-   #get_commands_from_snow(hostname='YanirServer')
+   get_commands_from_snow(hostname='YanirServer')
    get_ips_from_snow()
    #send_json_to_snow()
    #set_status_to_sent('f49bffa3878b9d505db3db1cbbbb351e')
