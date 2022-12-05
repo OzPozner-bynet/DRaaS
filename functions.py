@@ -88,6 +88,37 @@ def run_command_on_device_wo_close(ip_address, username, password, command, sshC
                 print(error_message)
 
 
+def set_switch_interface(ip,interface, ifaceStatus):
+    """
+    This function ssh with <switch_user>@ip to ip and change the status of interface
+    """
+    # TODO: fix to advance setup like https://networklessons.com/python/python-ssh
+    if settings.debug_level > 0:
+        print("sshing to: " + settings.switches_username + "@" + ip)
+    sshClient = None
+    if sshClient == None:
+        ssh = paramiko.SSHClient()
+        ssh.load_system_host_keys()
+        # Add SSH host key when missing.
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    else:
+        ssh = sshClient
+    # login and run commands to get configuration
+    #output = run_command_on_device_wo_close(ip, switches_username, switches_password, "enable", ssh)
+    #if settings.debug_level > 5: print(output)
+    #output = run_command_on_device_wo_close(ip, switches_username, switches_password, enable_password, ssh)
+    #if settings.debug_level > 5: print(output)
+    output = run_command_on_device_wo_close(
+        ip, settings.switches_username, settings.switches_password, "terminal length 0", ssh)
+    if settings.debug_level > 5:
+        print(output)
+    output = run_command_on_device_wo_close(
+        ip, settings.switches_username, settings.switches_password, "show run", ssh)
+    if settings.debug_level > 5:
+        print(output)
+    # Close connection.
+    ssh.close()
+
 def get_switch_ios(ip):
     """
     This function ssh with <switch_user>@ip to ip and runs 'show running config'
