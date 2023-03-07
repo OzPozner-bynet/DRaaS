@@ -1,8 +1,11 @@
-import redis
+import redis, requests
 import re, json
+import os
+from functions import run_command_on_device_wo_close
 
 redis_server = redis.Redis()
 queue_name = "api_req_queue"
+switch_info_url = "https://bynetprod.service-now.com/api/bdml/switch/getSwitchLogin"
 
 def redis_set(KEY="",VALUE=""):
     redis_server.set(name=KEY, value=VALUE)
@@ -15,6 +18,9 @@ def redis_queue_push(TASK):
 def redis_queue_get():
     req = redis_server.lpop(queue_name)
     return req
+
+def build_command(iface, port_mode, vlans):
+    return f"set {iface} on {vlans} {port_mode}"
 
 if __name__ == "__main__":
     redis_queue_push(json.dumps(
@@ -81,14 +87,24 @@ if __name__ == "__main__":
         req_switch_ip = next_req["result"]["switch_ip"]
         req_interface_name = next_req["result"]["interface_name"]
         req_port_mode = next_req["result"]["port_mode"]
-        req_cmd = ""
         if next_req["result"]["command"] != "":
             req_cmd = next_req["result"]["command"]
+        else:
+            req_cmd = build_command(req_interface_name, req_port_mode, req_vlans)
 
         redis_set(req_id, "TO_DO")
         print(f"working on request id: {req_id}, setting vlans: {req_vlans}, on switch: {req_switch}")
-        if req_cmd:
+        print("getting switch login info")
+        switch_details = requests.post(switch_info_url, data=f"{{ 'switch_id': '{req_switch}' }}", 
+                                       headers={'Content-Type': 'application/json'}, auth=('admin','Danut24680')).json()
+        if switch_details['result'] != []:
+            switch_user = switch_details['result'][0]['switch_username']
+            switch_pass = switch_details['result'][0]['switch_password']
+            print(f"login into switch with:\nuser: {switch_user}\npass: {switch_pass}")
+            
             print(f"running: {req_cmd}")
+            run_command_on_device_wo_close(req_switch_ip, switch_user, switch_pass, req_cmd)
+
         print(f"finish request id: {req_id} ")
         redis_set(req_id, "DONE")
         print("\n")
