@@ -20,7 +20,7 @@ def redis_queue_get():
     return req
 
 def build_command(iface, port_mode, vlans):
-    return f"set {iface} on {vlans} {port_mode}"
+    return f"interface {iface}, switchport {port_mode} allowed vlan {vlans}"
 
 if __name__ == "__main__":
     redis_queue_push(json.dumps(
@@ -32,48 +32,48 @@ if __name__ == "__main__":
             "command": "",
             "switch": "2aa1ebb587571d905db3db1cbbbb359d",
             "switch_status": "on",
-            "switch_ip": "192.168.128.65",
-            "interface_name": "port-channel",
+            "switch_ip": "192.168.88.30",
+            "interface_name": "GigabitEthernet0/3",
             "port_mode": "trunk",
             "dr_status": "Send_to_switch",
-            "vlans": "1604,1282,201,202,203,204,205,206,207,208,209,1603,1604,154,155,156,998,1282,1283"
+            "vlans": "3,4,5" # "1604,1282,201,202,203,204,205,206,207,208,209,1603,1604,154,155,156,998,1282,1283"
         }
 }
 ).replace("\n", ""))
-    redis_queue_push(json.dumps(
-{
-    "result":
-       {
-            "command_number": "DRA0001011",
-            "record_id": "fc1001ab8791a550220a98a83cbb35cc",
-            "command": "show run",
-            "switch": "2aa1ebb587571d905db3db1cbbbb400d",
-            "switch_status": "on",
-            "switch_ip": "192.168.128.68",
-            "interface_name": "mac-channel",
-            "port_mode": "main",
-            "dr_status": "Send_to_switch",
-            "vlans": "205,206,207,208,209,210214,215,216,217,218,222,1602,154,155,156,998,1282,1283"
-        }
-}
-).replace("\n", ""))
-    redis_queue_push(json.dumps(
-{
-    "result":
-       {
-            "command_number": "DRA0001012",
-            "record_id": "fc1001ab8791a550220a98a83cbb35cc",
-            "command": "some costum cmd",
-            "switch": "2aa1ebb587571d905db3db1cbbbb567f",
-            "switch_status": "on",
-            "switch_ip": "192.168.128.70",
-            "interface_name": "vic-channel",
-            "port_mode": "metro",
-            "dr_status": "Send_to_switch",
-            "vlans": "205,206,207,218,222,1602,154,155,156"
-        }
-}
-).replace("\n", ""))
+#     redis_queue_push(json.dumps(
+# {
+#     "result":
+#        {
+#             "command_number": "DRA0001011",
+#             "record_id": "fc1001ab8791a550220a98a83cbb35cc",
+#             "command": "show run",
+#             "switch": "2aa1ebb587571d905db3db1cbbbb400d",
+#             "switch_status": "on",
+#             "switch_ip": "192.168.128.68",
+#             "interface_name": "mac-channel",
+#             "port_mode": "main",
+#             "dr_status": "Send_to_switch",
+#             "vlans": "205,206,207,208,209,210214,215,216,217,218,222,1602,154,155,156,998,1282,1283"
+#         }
+# }
+# ).replace("\n", ""))
+#     redis_queue_push(json.dumps(
+# {
+#     "result":
+#        {
+#             "command_number": "DRA0001012",
+#             "record_id": "fc1001ab8791a550220a98a83cbb35cc",
+#             "command": "some costum cmd",
+#             "switch": "2aa1ebb587571d905db3db1cbbbb567f",
+#             "switch_status": "on",
+#             "switch_ip": "192.168.128.70",
+#             "interface_name": "vic-channel",
+#             "port_mode": "metro",
+#             "dr_status": "Send_to_switch",
+#             "vlans": "205,206,207,218,222,1602,154,155,156"
+#         }
+# }
+# ).replace("\n", ""))
 
     q_len = redis_server.llen(queue_name)
     requests_list = redis_server.lrange(queue_name, 0, q_len)
@@ -98,8 +98,8 @@ if __name__ == "__main__":
         switch_details = requests.post(switch_info_url, data=f"{{ 'switch_id': '{req_switch}' }}", 
                                        headers={'Content-Type': 'application/json'}, auth=('admin','Danut24680')).json()
         if switch_details['result'] != []:
-            switch_user = switch_details['result'][0]['switch_username']
-            switch_pass = switch_details['result'][0]['switch_password']
+            switch_user = "shapi" # switch_details['result'][0]['switch_username']
+            switch_pass = "patish" # switch_details['result'][0]['switch_password']
             print(f"login into switch with:\nuser: {switch_user}\npass: {switch_pass}")
             
             print(f"running: {req_cmd}")
