@@ -1,8 +1,12 @@
+import time
+import sys
+import threading
 NULL = 0
 from unittest import result
 import settings
 import requests
 import json
+import re
 import os
 # parameters from .ini file
 # date support
@@ -12,6 +16,38 @@ import paramiko
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+class ssh_new:
+    shell = None
+    client = None
+    transport = None
+
+    def __init__(self, address, username, password):
+        print("Connecting to server on ip", str(address) + ".")
+        self.client = paramiko.SSHClient()
+        self.client.set_missing_host_key_policy(paramiko.client.AutoAddPolicy())
+        self.client.connect(address, username=username, password=password, look_for_keys=False)
+
+    def close_connection(self):
+        if(self.client != None):
+            self.client.close()
+
+    def open_shell(self):
+        self.shell = self.client.invoke_shell()
+
+
+    def exec_command(self, command):
+        _, ssh_stdout, ssh_stderr = self.client.exec_command(command)
+        err = ssh_stderr.readlines()
+        return err if err else ssh_stdout.readlines()
+
+    def send_shell(self, command):
+        if(self.shell):
+            return self.shell.send(command + "\n")
+        else:
+            print("Shell not opened.")
+
 
 def run_command_on_device_wo_close(ip_address, username, password, command, sshClient=None):
     """ Connect to a device, run a command, and return the output."""
@@ -24,15 +60,16 @@ def run_command_on_device_wo_close(ip_address, username, password, command, sshC
     else:
         ssh = sshClient
 
-    if 'DEFAULT' in settings.config:
-        total_attempts = int(settings.config['DEFAULT']['total_ssh_attempts'])
-    else:
-        total_attempts = 1
+#    if 'DEFAULT' in settings.config:
+#        total_attempts = int(settings.config['DEFAULT']['total_ssh_attempts'])
+#    else:
+#        total_attempts = 1
+    total_attempts = 1
 
-    for attempt in range(total_attempts, settings.debug_level):
+    for attempt in range(total_attempts):#, settings.debug_level):
         try:
-            if settings.debug_level > 5:
-                print("Attempt to connect: %s" % attempt)
+#            if settings.debug_level > 5:
+#                print("Attempt to connect: %s" % attempt)
             # Connect to router using username/password authentication.
             ssh.connect(ip_address,
                         username=username,
@@ -51,6 +88,15 @@ def run_command_on_device_wo_close(ip_address, username, password, command, sshC
                 print("Unable to connect")
                 print(error_message)
 
+
+def set_switch_interface(ip_address,interface, ifaceStatus="enable"):
+    """
+    This function ssh with <switch_user>@ip to ip and change the status of interface
+    """
+    # TODO: fix to advance setup like https://networklessons.com/python/python-ssh
+    if settings.debug_level > 0:
+        print("sshing to: " + settings.switches_username + "@" + ip)
+    change_interface_mode(ip_address, "shapi", "patish", None, "interface="+interface, "status=disable")
 
 def get_switch_ios(ip):
     """
@@ -127,7 +173,7 @@ def get_commands_from_snow(hostname=None, ip=None):
     """
     This function gets commands from snow API
     """
-    commandsUrl = settings.url + "api/bdml/parse_switch_json/GETCommands"
+    commandsUrl = settings.url + "GETCommands"
     if (ip != None):
         myparams = {"switch_ip": str(ip)}
     if (hostname != None):
@@ -177,7 +223,7 @@ def get_ips_from_snow():
     """
     This function gets list of switchs ips from snow API
     """
-    commandsUrl = settings.url + 'api/bdml/parse_switch_json/SwitchIPs'
+    commandsUrl = settings.url + 'SwitchIPs'
     #
 
     response = requests.get(commandsUrl, headers={
@@ -198,18 +244,26 @@ def get_ips_from_snow():
           print(str(response))
     if (response.status_code == 200 | response.status_code == 201):
       if(myresponse):
-        myjson = json.loads(str(response.content)[2:-1])
-        settings.ips = myjson["result"]["ips"]
-        print(settings.ips)
+        # myjson = json.loads(str(response.content)[2:-1])
+        jsonResponse = json.loads(str(response.content)[2:-1])
+        print(jsonResponse)
+        print("##########")
+        print(jsonResponse["result"])
+        for each in jsonResponse["result"]:
+           print(each['ip'])
+           print(each['username'])
+           print(each['password'])
+        # settings.ips = myjson["result"]["ips"]
+        # print(settings.ips)
       else:
           return 'error bad payload'
     else:
         return 'bad response from snow code:' + str(response.status_code) + ' message: ' + str(myresponse)
-    #switch_username = myresponse["result"]["username"]
-    #switch_password = myresponse["result"]["password"]
-    #print(switch_username)
-    #print(switch_password)
-
+#    switch_username = myresponse["result"]["username"]
+#    switch_password = myresponse["result"]["password"]
+#    print(switch_username)
+#    print(switch_password)
+#
 
 def set_status_to_sent(sysid):
     """
@@ -227,6 +281,7 @@ def set_status_to_sent(sysid):
     if settings.debug_level > 1:
         print(msg)
         print(response.json())
+
 
 #waiting to oz for switch
 def send_commands_to_switch(ip, command):
@@ -285,6 +340,20 @@ def send_commands_to_switch(ip, command):
     # Close connection.
     ssh.close()
 
+# def get_interface_vlan_status(ipAddress):
+#     try:
+#         session = paramiko.SSHClient()
+#         session.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+#         session.connect(ipAddress,username=shapi,password=patish,allow_agent=False,look_for_keys=False, timeout=300)
+#         # SCPCLient takes a paramiko transport as an argument
+#         connection=session.invoke_shell()
+#
+#         connection.send("show int gig0/1 switchport".encode('ascii') + b"\n")
+#     except paramiko.AuthenticationException as e :
+#         print(e)
+
+
+
 #working
 def today():
     now = datetime.now()
@@ -317,56 +386,209 @@ for i in ips:
     
     send_json_to_snow(payload) 
 """
-def parse_and_send_command(ip, command):
-    match command:
-      case 'get ios':
-        ip=ip.strip()
-        print ("command get ios for ip:"+ str(ip))
-        #get_switch_ios(ip)
-        filename = settings.base_path+"\\temp\\"+ip.replace(".","_")+today()
-        # get_JSON_from_IOS(filename)
-        #JSON_file_name = settings.base_path+"\\temp\\"+ip.replace(".","_")+today()+".JSON"
-        # manual test:
-        JSON_file_name = settings.base_path+"\\temp\\"+"spakim.json"
-        f = open( JSON_file_name , "r")
-        data_json = f.readlines()
-        f.close()
-        json = ''
-        for line in data_json:
-          json += line #.replace("\n","").replace('\"','"')
-          #data_json = {"hello": "world"}
-        payload = {'json_payload': json}
-        #send_json_to_snow(payload) 
-        response = send_json_to_snow(payload)
-      case "pattern-2":
-        response = send_commands_to_switch(ip = ip, command = command)
-      case "pattern-3":
-        response = send_commands_to_switch(ip = ip, command = command)
-      case _:
-        response = send_commands_to_switch(ip = ip, command = command)
-    return response
+#def parse_and_send_command(ip, command):
+#    match command:
+#      case 'get ios':
+#        ip=ip.strip()
+#        print ("command get ios for ip:"+ str(ip))
+#        #get_switch_ios(ip)
+#        filename = settings.base_path+"\\temp\\"+ip.replace(".","_")+today()
+#        # get_JSON_from_IOS(filename)
+#        #JSON_file_name = settings.base_path+"\\temp\\"+ip.replace(".","_")+today()+".JSON"
+#        # manual test:
+#        JSON_file_name = settings.base_path+"\\temp\\"+"spakim.json"
+#        f = open( JSON_file_name , "r")
+#        data_json = f.readlines()
+#        f.close()
+#        json = ''
+#        for line in data_json:
+#          json += line #.replace("\n","").replace('\"','"')
+#          #data_json = {"hello": "world"}
+#        payload = {'json_payload': json}
+#        #send_json_to_snow(payload) 
+#        #send_json_to_snow(payload)
+#        response = send_json_to_snow(payload)
+#        response = send_json_to_snow(payload)
+#      case "pattern-2":
+#        response = send_commands_to_switch(ip = ip, command = command)
+#      case "pattern-3":
+#        response = send_commands_to_switch(ip = ip, command = command)
+#      case _:
+#        response = send_commands_to_switch(ip = ip, command = command)
+#    return response
+
+def get_interfaces_mode(ip_address, username, password, interfaces, sshClient=None):
+    interfaces_mode = []
+    for interface in interfaces:
+        command = "show int " + interface + " switchport | include Administrative Mode:"
+        response = run_command_on_device_wo_close(ip_address, username, password,
+                                                  command, sshClient)[0]
+        interface_mode = str(response.replace("\n", "").replace("\r", "").replace("Administrative Mode: ", ""))
+        interface_mode = {
+            'interface': interface,
+            'mode': interface_mode
+        }
+        interfaces_mode.append(interface_mode)
+    return interfaces_mode
+
+def get_all_interfaces(ip_address, username, password, sshClient=None):
+    interfaces = run_command_on_device_wo_close(ip_address, username, password, 'show int switchport | include Name',
+                                           sshClient)
+    for idx, interface in enumerate(interfaces):
+        interfaces[idx] = interface.split()[1]
+    return interfaces
+
+
+def check_vlan_exists(ip_address, username, password, vlan_id, sshClient=None):
+    response = run_command_on_device_wo_close(ip_address, username, password, f'show vlan id {vlan_id}', sshClient)[1]
+    if "not found in current VLAN database" in response:
+        return False
+    return True
+
+def check_privileged_connection(connection):
+    buffer_size = 4096
+    def flush(connection):
+        while connection.shell.recv_ready():
+            connection.shell.recv(buffer_size)
+    def get_prompt(connection):
+        flush(connection)  # flush everything from before
+        connection.shell.sendall('\n')
+
+        time.sleep(.3)
+        data = str(connection.shell.recv(buffer_size), encoding='utf-8').strip()
+        flush(connection)  # flush everything after (just in case)
+
+        return data
+    prompt = get_prompt(connection)
+    return True if prompt[-1] == '#' else False
+
+
+def change_interface_mode(ip_address, username, password, interface, mode, vlan_id, enable_pass=None):
+#def change_interface_mode(ip_address, username, password, enable_pass=None, **kwargs):
+    connection = ssh_new(ip_address, username, password)
+    connection.open_shell()
+    time.sleep(1)
+    #print("kwargs: ", kwargs)
+
+
+    if not check_privileged_connection(connection):
+        if enable_pass is not None:
+            connection.send_shell('enable')
+            time.sleep(1)
+            connection.send_shell(enable_pass)
+            time.sleep(1)
+        else:
+            raise ValueError(f'enable_pass is missing and SSH connection is not privileged')
+
+    connection.send_shell('conf terminal')
+    time.sleep(1)
+    connection.send_shell(f'interface {interface}')
+    time.sleep(1)
+
+    if mode == 'trunk':
+        connection.send_shell('switchport mode trunk')
+        print(f'interface {interface} mode changed to trunk')
+        time.sleep(1)
+        if vlan_id == None:
+            connection.send_shell('switchport trunk encapsulation dot1q')
+        else:
+            if check_vlan_exists(ip_address, username, password, vlan_id) == False:
+                raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
+            connection.send_shell(f'switchport trunk allowed vlan {vlan_id}')
+            answer = f'interface {interface} mode changed to trunk'
+    elif mode == 'access':
+        connection.send_shell('switchport mode access')
+        print(f'Interface {interface} mode changed to access')
+        answer = f'Interface {interface} mode changed to access'
+    elif mode == 'vlan':
+        if check_vlan_exists(ip_address, username, password, vlan_id) == False:
+            raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
+
+        connection.send_shell(f'switchport access vlan {vlan_id}')
+        print(f'Interface {interface} added to VLAN {vlan_id}')
+        answer = f'Interface {interface} added to VLAN {vlan_id}'
+    time.sleep(1)
+    connection.close_connection()
+
+    return answer
+
 
 def run():
-   number_of_runs = 1
-   for x in range(number_of_runs):
-    print(get_ips_from_snow())
-    for ip in settings.ips:
-     print('current ip is: ' + ip.strip())
-     commands = get_commands_from_snow(ip=ip.strip())
-     if type(commands) is str:
-         response = parse_and_send_command(ip,commands)
-     else:
-        for command in commands:
-         response = parse_and_send_command(ip,command)
-   else:
-    print("Finally finished!")
+   # number_of_runs = 1
+   # for x in range(number_of_runs):
+   #  print(get_ips_from_snow())
+   #  for ip in settings.ips:
+   #   print('current ip is: ' + ip.strip())
+   #   commands = get_commands_from_snow(ip=ip.strip())
+   #   if type(commands) is str:
+   #       response = parse_and_send_command(ip,commands)
+   #   else:
+   #      for command in commands:
+   #       response = parse_and_send_command(ip,command)
+   # else:
+   #  print("Finally finished!")
     
-   #get_commands_from_snow(hostname='YanirServer')
-   #get_ips_from_snow()
+   get_commands_from_snow(hostname='YanirServer')
+   get_ips_from_snow()
    #send_json_to_snow()
    #set_status_to_sent('f49bffa3878b9d505db3db1cbbbb351e')
-    #send_commands_to_switch(ip="10.10.20.48", command="hostname yanir")
+   #send_commands_to_switch(ip="10.10.20.48", command="hostname yanir")
+
+   # def get_interface_vlan_status(ip_address, username, password, command, sshClient=None):
+   #     try:
+   #         session = paramiko.SSHClient()
+   #         session.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+   #         session.connect(ipAddress,username=shapi,password=patish,allow_agent=False,look_for_keys=False, timeout=300)
+   #         # SCPCLient takes a paramiko transport as an argument
+   #         connection=session.invoke_shell()
+   #
+   #         connection.send("show int gig0/1 switchport".encode('ascii') + b"\n")
+   #     except paramiko.AuthenticationException as e :
+   #         print(e)
+
+
+   ssh = paramiko.SSHClient()
+   ssh.load_system_host_keys()
+   # Add SSH host key when missing.
+   ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+   #print(check_vlan_exists('192.168.88.27', 'shapi', 'patish', 3, ssh))
+   change_interface_mode('192.168.88.27', 'nandi', 'iolredi8', 'Gi0/9', 'access', 2, 'cisco')
+   # interfaces = get_all_interfaces('192.168.88.27', 'shapi', 'patish', ssh)
+   #interfaces_mode = get_interfaces_mode('192.168.88.27', 'shapi', 'patish', ['Gi0/9'], ssh)
+   #print(interfaces_mode)
+
+   # for interface_mode in interfaces_mode:
+   #     if interface_mode['mode'] == 'dynamic auto' and interface_mode['interface'] != :
+   #         print(f"I will change {interface_mode['interface']} to trunk")
+
+   # for port in ports:
+   #     if port == "Gi0/3":
+   #         continue
+   #     command = "show int " + port + " switchport"
+   #     print(port)
+   #     response = run_command_on_device_wo_close('192.168.88.27', 'nandi', 'iolredi8',
+   #                                               command, ssh)[2]
+   #     port_mode = str(response.replace("\n","").replace("Administrative Mode: ",""))
+   #     print(port_mode)
+   #     if "dynamic auto" in port_mode:
+   #         print("change")
+   #         command = """enable
+   #         cisco
+   #         disable
+   #         """
+   #         run_command_on_device_wo_close('192.168.88.27', 'nandi', 'iolredi8',
+   #                                        command, ssh)
+   #         time.sleep(1)
+   ssh.close()
+
+
 
 
 if __name__ == "__main__":
-    run()
+    try:
+        run()
+    except Exception as err:
+        print(f'{type(err)}: {err}')
+
+
