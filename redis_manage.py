@@ -14,8 +14,6 @@ update_req_url = snow_url+"/SetCommandStatus"
 
 def redis_set(KEY="",VALUE=""):
     redis_server.set(name=KEY, value=VALUE)
-    # key_val = redis_server.get(KEY)
-    # print(f"{KEY} : {key_val}")
 
 def get_requests():
     commands = requests.post(get_cmds_url, headers={'Content-Type': 'application/json'}, auth=('admin','Danut24680')).json()
@@ -46,10 +44,10 @@ def redis_queue_get():
 def json_parser(to_parse):
     first_setup = to_parse.replace('\\n', '\n').replace('\\r', '\r').replace("'!","")
     clean = re.sub("(\'|\,)", "", first_setup)
-    if re.search(r'(^\[|\]$)', clean):
-        switch_braces = re.sub("\]$","}",re.sub("^\[","{",clean))
 
     formated = ""
+
+    switch_braces = re.sub("\]$","}",re.sub("^\[","{",clean))
 
     empty_lines = 0
     for e_line in switch_braces.splitlines():
@@ -119,7 +117,7 @@ if __name__ == "__main__":
                     if req_cmd != "" and req_port_mode == "":
                         output = json_parser(str(run_command_on_device_wo_close(req_switch_ip, switch_user, switch_pass, req_cmd)))
                     else:
-                        output = str(change_interface_mode(req_switch_ip, switch_user, switch_pass, req_interface_name, req_port_mode, req_vlans))
+                        output = change_interface_mode(req_switch_ip, switch_user, switch_pass, req_interface_name, req_port_mode, req_vlans)
                 except Exception as error:
                     send_status_update(req_id, "failed", error)
                 else:
@@ -130,4 +128,4 @@ if __name__ == "__main__":
                 continue
 
         time.sleep(10)
-            
+
