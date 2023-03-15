@@ -78,7 +78,7 @@ def run_command_on_device_wo_close(ip_address, username, password, command, sshC
             # Run command.
             ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(command)
             # Read output from command.
-            output = ssh_stdout.readlines()
+            output = ssh_stdout.read()
             # Close connection.
             # W/o close =># ssh.close()
             return output
@@ -440,7 +440,8 @@ def get_all_interfaces(ip_address, username, password, sshClient=None):
 
 
 def check_vlan_exists(ip_address, username, password, vlan_id, sshClient=None):
-    response = run_command_on_device_wo_close(ip_address, username, password, f'show vlan id {vlan_id}', sshClient)[1]
+    response = run_command_on_device_wo_close(ip_address, username, password, f'show vlan id {vlan_id}', sshClient).decode()#[1]
+    print(response)
     if "not found in current VLAN database" in response:
         return False
     return True
@@ -469,7 +470,6 @@ def change_interface_mode(ip_address, username, password, interface, mode, vlan_
     connection.open_shell()
     time.sleep(1)
     #print("kwargs: ", kwargs)
-
 
     if not check_privileged_connection(connection):
         if enable_pass is not None:
@@ -500,13 +500,14 @@ def change_interface_mode(ip_address, username, password, interface, mode, vlan_
         connection.send_shell('switchport mode access')
         print(f'Interface {interface} mode changed to access')
         answer = f'Interface {interface} mode changed to access'
-    elif mode == 'vlan':
-        if check_vlan_exists(ip_address, username, password, vlan_id) == False:
-            raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
+        if vlan_id != None:
+            if check_vlan_exists(ip_address, username, password, vlan_id) == False:
+                raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
+            print("test")
 
-        connection.send_shell(f'switchport access vlan {vlan_id}')
-        print(f'Interface {interface} added to VLAN {vlan_id}')
-        answer = f'Interface {interface} added to VLAN {vlan_id}'
+            connection.send_shell(f'switchport access vlan {vlan_id}')
+            print(f'Interface {interface} added to VLAN {vlan_id}')
+            answer += f'\nInterface {interface} added to VLAN {vlan_id}'
     time.sleep(1)
     connection.close_connection()
 
