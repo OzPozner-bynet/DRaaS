@@ -1,4 +1,4 @@
-requests == 2.25.1
+requests == 2.31.0
 python-dotenv == 0.20.0
 configparser == 5.2.0
 datetime == 4.7
