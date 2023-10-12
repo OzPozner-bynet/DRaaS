@@ -111,16 +111,16 @@ if __name__ == "__main__":
                 for i in range(len1):
                     if(switch_details['result'][i]['ip'] == req_switch_ip):
                         print("username: " + switch_details['result'][i]['username'] + ", password: " + switch_details['result'][i]['password'])
+                        i=i
                     
-            
                 try:
                     if req_cmd != "" and req_port_mode == "":
                         if req_interface_name != "":
-                            output = json_parser(run_command_on_device_wo_close(req_switch_ip, switch_user, switch_pass, req_cmd+" "+req_interface_name))
+                            output = json_parser(run_command_on_device_wo_close(req_switch_ip, switch_details['result'][i]['username'], switch_details['result'][i]['password'], req_cmd+" "+req_interface_name))
                         else:
-                            output = json_parser(run_command_on_device_wo_close(req_switch_ip, switch_user, switch_pass, req_cmd))
+                            output = json_parser(run_command_on_device_wo_close(req_switch_ip, switch_details['result'][i]['username'], switch_details['result'][i]['password'], req_cmd))
                     else:
-                        output = change_interface_mode(req_switch_ip, switch_user, switch_pass, req_interface_name, req_port_mode, req_vlans)
+                        output = change_interface_mode(req_switch_ip, switch_details['result'][i]['username'], switch_details['result'][i]['password'], req_interface_name, req_port_mode, req_vlans)
                 except Exception as error:
                     send_status_update(req_id, "failed", error)
                 else:
@@ -128,8 +128,8 @@ if __name__ == "__main__":
                     task_sts = json.loads(redis_server.get(req_id).decode())["status"]
                     send_status_update(req_id, task_sts, output)
                     
-            #elif: "completed" in str(task_sts):
+            elif "completed" in str(task_sts):
                 continue
         
-    sleep(10)
+        sleep(10)
 
