@@ -12,6 +12,7 @@ update_req_url = snow_url+"/SetCommandStatus"
 
 def get_requests():
     commands = requests.post(get_cmds_url, headers={'Content-Type': 'application/json'}, auth=('admin','Danut24680')).json()
+    print (commands['result'])
     return commands['result']
 
 def send_status_update(ID, STATUS, OUTPUT):
@@ -38,14 +39,17 @@ def redis_queue_push(TASKS):
                     send_status_update(TASK["record_id"], kv_status["status"], output)
                 else:
                     redis_server.rpush(queue_name, str(TASK))
-                    print(f'added {TASK["record_id"]} to queue')
+
+                    #print(f'added {TASK["record_id"]} to queue')
             else:
                 redis_server.rpush(queue_name, str(TASK))
-                print(f'added {TASK["record_id"]} to queue')
+
+                #print(f'added {TASK["record_id"]} to queue')
 
 if __name__ == "__main__":
-    while True:
+    #while True:
         redis_queue_push(get_requests())
-        
+
         sleep(10)
+    
 

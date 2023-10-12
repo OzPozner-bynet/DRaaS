@@ -1,5 +1,5 @@
 import redis, requests
-import re, json
+import re, json, sys, dotenv
 from time import sleep
 from functions import run_command_on_device_wo_close
 from functions import change_interface_mode
@@ -8,7 +8,7 @@ from functions import change_interface_mode
 redis_server = redis.Redis()
 queue_name = "api_req_queue"
 snow_url = "https://bynetprod.service-now.com/api/bdml/switch"
-switch_info_url = snow_url+"/getSwitchLogin"
+switch_info_url = "https://bynetprod.service-now.com/api/bdml/parse_switch_json/SwitchIPs"
 get_cmds_url = snow_url+"/getCommands"
 update_req_url = snow_url+"/SetCommandStatus"
 
@@ -88,7 +88,7 @@ if __name__ == "__main__":
             req_id = json_req["record_id"]
             req_vlans = json_req["vlans"]
             req_switch = "2aa1ebb587571d905db3db1cbbbb359d" # json_req["switch"]
-            req_switch_ip = "192.168.88.30" # json_req["switch_ip"]
+            req_switch_ip = json_req["switch_ip"]
             req_interface_name = json_req["interface_name"]
             req_port_mode = json_req["port_mode"]
             if json_req["command"] != "":
@@ -102,11 +102,16 @@ if __name__ == "__main__":
                 task_sts = redis_server.get(req_id)
 
             if "active" in str(task_sts):
-                switch_details = requests.post(switch_info_url, data=f"{{ 'switch_id': '{req_switch}' }}", 
+                switch_details = requests.get(switch_info_url, data=f"{{ 'switch_id': '{req_switch}' }}", 
                                     headers={'Content-Type': 'application/json'}, auth=('admin','Danut24680')).json()
-    #     if switch_details['result'] != []:
-                switch_user = "shapi" # switch_details['result'][0]['switch_username']
-                switch_pass = "patish" # switch_details['result'][0]['switch_password']
+                
+
+                len1 = len(switch_details['result'])
+
+                for i in range(len1):
+                    if(switch_details['result'][i]['ip'] == req_switch_ip):
+                        print("username: " + switch_details['result'][i]['username'] + ", password: " + switch_details['result'][i]['password'])
+                    
             
                 try:
                     if req_cmd != "" and req_port_mode == "":
@@ -122,8 +127,9 @@ if __name__ == "__main__":
                     redis_set(req_id, "completed", output)
                     task_sts = json.loads(redis_server.get(req_id).decode())["status"]
                     send_status_update(req_id, task_sts, output)
-            elif "completed" in str(task_sts):
+                    
+            #elif: "completed" in str(task_sts):
                 continue
         
-        sleep(10)
+    sleep(10)
 
