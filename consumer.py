@@ -104,23 +104,20 @@ if __name__ == "__main__":
             if "active" in str(task_sts):
                 switch_details = requests.get(switch_info_url, data=f"{{ 'switch_id': '{req_switch}' }}", 
                                     headers={'Content-Type': 'application/json'}, auth=('admin','Danut24680')).json()
-                
 
-                len1 = len(switch_details['result'])
-
-                for i in range(len1):
+                for i in range(len(switch_details['result'])):
                     if(switch_details['result'][i]['ip'] == req_switch_ip):
-                        print("username: " + switch_details['result'][i]['username'] + ", password: " + switch_details['result'][i]['password'])
-                        i=i
+                        switch_user=switch_details['result'][i]['username']
+                        switch_password=switch_details['result'][i]['password']
                     
                 try:
                     if req_cmd != "" and req_port_mode == "":
                         if req_interface_name != "":
-                            output = json_parser(run_command_on_device_wo_close(req_switch_ip, switch_details['result'][i]['username'], switch_details['result'][i]['password'], req_cmd+" "+req_interface_name))
+                            output = json_parser(run_command_on_device_wo_close(req_switch_ip, switch_user, switch_password, req_cmd+" "+req_interface_name))
                         else:
-                            output = json_parser(run_command_on_device_wo_close(req_switch_ip, switch_details['result'][i]['username'], switch_details['result'][i]['password'], req_cmd))
+                            output = json_parser(run_command_on_device_wo_close(req_switch_ip, switch_user, switch_password, req_cmd))
                     else:
-                        output = change_interface_mode(req_switch_ip, switch_details['result'][i]['username'], switch_details['result'][i]['password'], req_interface_name, req_port_mode, req_vlans)
+                        output = change_interface_mode(req_switch_ip, switch_user, switch_password, req_interface_name, req_port_mode, req_vlans)
                 except Exception as error:
                     send_status_update(req_id, "failed", error)
                 else:
