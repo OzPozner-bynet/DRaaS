@@ -88,13 +88,14 @@ def run_command_and_get_json(ip_address, username, password, command, sshClient=
     print(json_data)
     return json_data
 
+
 def set_switch_interface(ip_address,interface, ifaceStatus="enable"):
     """
     This function ssh with <switch_user>@ip to ip and change the status of interface
     """
-    if settings.debug_level > 0:
-        print("sshing to: " + settings.switches_username + "@" + ip)
+    print("sshing to: " + switch_user + "@" + ip_address)
     change_interface_mode(ip_address, "shapi", "patish", None, "interface="+interface, "status=disable")
+
 
 def send_json_to_snow(payload):
     """
@@ -104,12 +105,13 @@ def send_json_to_snow(payload):
     response = requests.post(
         settings.url + "api/bdml/parse_switch_json/DRaaS/ParseSwitch",
         headers={'Content-Type': 'application/json'},
-        auth=(settings.username, settings.password),
+        auth=(switch_user, switch_password),
         json=payload
     )
     msg = "status is: " + str(response.status_code)
     print(msg)
     print(response.json())
+
 
 def get_commands_from_snow(hostname=None, ip=None):
     """
@@ -154,7 +156,7 @@ def get_commands_from_snow(hostname=None, ip=None):
     else:
         return 'bad response from snow code:' + str(response.status_code) + ' message: ' + str(myresponse)
 
-    
+
 def is_json(myjson):
   try:
     json.loads(str(myjson))
@@ -162,7 +164,7 @@ def is_json(myjson):
     return False
   return True
 
-#working: brings the ips to take care
+
 def get_ips_from_snow():
     """
     This function gets list of switchs ips from snow API
@@ -275,6 +277,7 @@ def get_interfaces_mode(ip_address, username, password, interfaces, sshClient=No
         interfaces_mode.append(interface_mode)
     return interfaces_mode
 
+
 def get_all_interfaces(ip_address, username, password, sshClient=None):
     interfaces = run_command_and_get_json(ip_address, username, password, 'show int switchport | include Name',
                                            sshClient)
@@ -289,6 +292,7 @@ def check_vlan_exists(ip_address, username, password, vlan_id, sshClient=None):
     if "not found in current VLAN database" in response:
         return False
     return True
+
 
 def check_privileged_connection(connection):
     buffer_size = 4096
@@ -313,7 +317,6 @@ def change_interface_mode(ip_address, username, password, interface, mode, vlan_
     connection = ssh_new(ip_address, username, password)
     connection.open_shell()
     time.sleep(1)
-    #print("kwargs: ", kwargs)
 
     if not check_privileged_connection(connection):
         if enable_pass is not None:
