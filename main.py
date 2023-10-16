@@ -1,11 +1,6 @@
-#!/usr/bin/env python3
-#
-#from curses.ascii import NUL
-#from zipfile import ZIP_BZIP2
-#from asyncio.windows_events import NULL
+
 NULL = 0
 from collections.abc import Mapping
-import settings
 # import requests
 import json
 # parameters from ENV
@@ -83,7 +78,6 @@ if int(debug_level) > 2:
 #get_commands_from_snow(hostname='YanirServer',ip='none', url)
 
 if __name__ == "__main__":
-    settings.init()
     run()
     #get_commands_from_snow(hostname='YanirServer', url)
 

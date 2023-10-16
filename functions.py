@@ -3,7 +3,6 @@ import sys
 import threading
 NULL = 0
 from unittest import result
-import settings
 import requests
 import json
 import re

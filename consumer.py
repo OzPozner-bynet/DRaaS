@@ -29,8 +29,7 @@ def send_status_update(ID, STATUS, OUTPUT):
 }
     )
     print(payload)
-    answer = requests.post(update_req_url, data=payload, 
-                    headers={'Content-Type': 'application/json'}, auth=('admin','Danut24680'))
+    answer = requests.post(update_req_url, data=payload, headers={'Content-Type': 'application/json'}, auth=('admin','Danut24680'))
 
 if __name__ == "__main__":
     while True:
@@ -61,9 +60,7 @@ if __name__ == "__main__":
                 task_sts = redis_server.get(req_id)
 
             if "active" in str(task_sts):
-                print("active")
-                switch_details = requests.get(switch_info_url, data=f"{{ 'switch_id': '{req_switch}' }}", 
-                                    headers={'Content-Type': 'application/json'}, auth=('admin','Danut24680')).json()
+                switch_details = requests.get(switch_info_url, data=f"{{ 'switch_id': '{req_switch}' }}", headers={'Content-Type': 'application/json'}, auth=('admin','Danut24680')).json()
 
                 for i in range(len(switch_details['result'])):
                     if(switch_details['result'][i]['ip'] == req_switch_ip):
