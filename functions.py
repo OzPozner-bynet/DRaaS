@@ -1,20 +1,13 @@
-import time
-import sys
-import threading
 NULL = 0
+import time, sys, threading
 from unittest import result
-import requests
-import json
-import re
-import os
+import requests, json, re, os
 from datetime import datetime
-
-import paramiko
-import configparser
-import confparser
+import paramiko, configparser, confparser
 
 from dotenv import load_dotenv
 load_dotenv()
+
 config = configparser.ConfigParser()
 config.sections()
 config.read('./config/parameters.ini')
