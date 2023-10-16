@@ -1,9 +1,8 @@
 import redis, requests
 import re, json, sys, dotenv
 from time import sleep
-from functions import run_command_on_device_wo_close
+from functions import run_command_and_get_json
 from functions import change_interface_mode
-
 
 redis_server = redis.Redis()
 queue_name = "api_req_queue"
@@ -15,7 +14,7 @@ update_req_url = snow_url+"/SetCommandStatus"
 def redis_set(KEY="",VALUE="",OUTPUT=""):
     OUTPUT = re.sub("\"","\\\"","      ".join(OUTPUT.splitlines()))
     redis_server.set(name=KEY, value=f'{{ "status": "{VALUE}", "output": "{OUTPUT}" }}')
-    # print(redis_server.get(KEY))
+    print(redis_server.get(KEY))
 
 def redis_queue_get():
     req = redis_server.lpop(queue_name).decode()
@@ -32,51 +31,11 @@ def send_status_update(ID, STATUS, OUTPUT):
     print(payload)
     answer = requests.post(update_req_url, data=payload, 
                     headers={'Content-Type': 'application/json'}, auth=('admin','Danut24680'))
-    print(answer.json())
-
-def json_parser(to_parse):
-    decode = to_parse.decode()
-    # first_setup = to_parse.replace('\\n', '\n').replace('\\r', '\r').replace("'!","")
-    # clean = re.sub("(\'|\,|b\')", "", first_setup)
-
-    if re.search(r'(^\[|\]$)', decode):
-        formated = ""
-
-        switch_braces = re.sub("\]$","}",re.sub("^\[","{",decode))
-
-        empty_lines = 0
-        for e_line in switch_braces.splitlines():
-            if len(re.findall(r'\w+', e_line)) == 1 or len(re.findall(r'\w+\-\w+\-?\w?', e_line)) == 1 or not e_line.strip():
-                empty_lines+=1
-        num_of_lines = len(switch_braces.splitlines()) - empty_lines
-        line_num = 1
-        for line in switch_braces.splitlines():
-            if len(re.findall(r'\w+\-\w+\-?\w?', line)) == 1:
-                continue
-            if len(re.findall(r'\w+', line)) == 1 or not line.strip():
-                continue
-            if line_num == 1:
-                formated = line+'\n'
-                line_num+=1
-                continue
-            formated1 = re.sub("(^\s+)(?=\w)", r'\1"', line,)
-            formated2 = re.sub("(\w)(?=\s)", r'\1":', formated1, 1)
-            if line_num == (num_of_lines-1):
-                formated3 = re.sub("(?<=\s)(\w.*)", r'"\1"\n', formated2, 1)
-            else:
-                formated3 = re.sub("(?<=\s)(\w.*)", r'"\1",\n', formated2, 1)
-            line_num+=1
-            formated = formated+formated3
-        parsed = json.loads(formated)
-    else:
-        parsed = decode.replace("!","")
-    return parsed
-
-
 
 if __name__ == "__main__":
     while True:
         q_len = redis_server.llen(queue_name)
+        print(f'Queue length: {q_len}')
         requests_list = redis_server.lrange(queue_name, 0, q_len)
 
         for req in requests_list:
@@ -102,6 +61,7 @@ if __name__ == "__main__":
                 task_sts = redis_server.get(req_id)
 
             if "active" in str(task_sts):
+                print("active")
                 switch_details = requests.get(switch_info_url, data=f"{{ 'switch_id': '{req_switch}' }}", 
                                     headers={'Content-Type': 'application/json'}, auth=('admin','Danut24680')).json()
 
@@ -113,9 +73,9 @@ if __name__ == "__main__":
                 try:
                     if req_cmd != "" and req_port_mode == "":
                         if req_interface_name != "":
-                            output = json_parser(run_command_on_device_wo_close(req_switch_ip, switch_user, switch_password, req_cmd+" "+req_interface_name))
+                            output = run_command_and_get_json(req_switch_ip, switch_user, switch_password, req_cmd+" "+req_interface_name)
                         else:
-                            output = json_parser(run_command_on_device_wo_close(req_switch_ip, switch_user, switch_password, req_cmd))
+                            output = run_command_and_get_json(req_switch_ip, switch_user, switch_password, req_cmd)
                     else:
                         output = change_interface_mode(req_switch_ip, switch_user, switch_password, req_interface_name, req_port_mode, req_vlans)
                 except Exception as error:

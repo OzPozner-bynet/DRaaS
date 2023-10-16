@@ -23,14 +23,16 @@ def send_status_update(ID, STATUS, OUTPUT):
     "command_output": f"{OUTPUT}"
 }
     )
-    print(payload)
+    #print(payload)
     answer = requests.post(update_req_url, data=payload, 
-                    headers={'Content-Type': 'application/json'}, auth=('admin','Danut24680'))
-    print(answer.json())
+                    headers={'Content-Type': 'application/json'}, auth=('admin','Danut24680')).json()
+    
+    #print(answer)
 
 def redis_queue_push(TASKS):
     for TASK in TASKS:
         if bool(re.search('(active|failed)', TASK["dr_status"])):
+            print("Active Task")
             kv_status = redis_server.get(TASK["record_id"])
             if kv_status != None:
                 kv_status = json.loads(kv_status.decode())
@@ -40,16 +42,15 @@ def redis_queue_push(TASKS):
                 else:
                     redis_server.rpush(queue_name, str(TASK))
 
-                    #print(f'added {TASK["record_id"]} to queue')
+                    print(f'added {TASK["record_id"]} to queue')
             else:
                 redis_server.rpush(queue_name, str(TASK))
 
-                #print(f'added {TASK["record_id"]} to queue')
+                print(f'added {TASK["record_id"]} to queue')
 
 if __name__ == "__main__":
-    #while True:
+    while True:
         redis_queue_push(get_requests())
-
         sleep(10)
     
 

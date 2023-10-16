@@ -12,14 +12,14 @@ def init():
     global switches_password
     debug_level = 0
     global config
-    config = configparser.ConfigParser()
+    #config = configparser.ConfigParser()
     config.sections()
     config.read('./config/parameters.ini')
 
     if 'DEFAULT' in config:
         debug_level = int(config['DEFAULT']['debug_level'])
     else:
-        debug_level = 0
+        debug_level = 1
 
     if "DEFAULT" in config:
         url = config["DEFAULT"]['Url']
