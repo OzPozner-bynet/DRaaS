@@ -7,20 +7,18 @@ import requests
 import json
 import re
 import os
-# parameters from .ini file
-# date support
 from datetime import datetime
-# SSH support
+
 import paramiko
 import configparser
 import confparser
-from dotenv import load_dotenv
 
+from dotenv import load_dotenv
+load_dotenv()
 config = configparser.ConfigParser()
 config.sections()
 config.read('./config/parameters.ini')
 
-load_dotenv()
 switch_user = "shapi"
 switch_password = "patish"
 
@@ -257,8 +255,6 @@ def send_commands_to_switch(ip, command):
     ssh.close()
 
 
-
-#working
 def today():
     now = datetime.now()
     date_time = now.strftime("_%m-%d-%Y-H-%H_")
