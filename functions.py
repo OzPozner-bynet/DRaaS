@@ -172,8 +172,7 @@ def get_ips_from_snow():
     """
     commandsUrl = "https://bynetprod.service-now.com/api/bdml/switch" + 'SwitchIPs'
 
-    response = requests.get(commandsUrl, headers={
-                            'Content-Type': 'application/json'}, auth=(switch_user, switch_password))
+    response = requests.get(commandsUrl, headers={'Content-Type': 'application/json'}, auth=(switch_user, switch_password))
 
     msg = "status is: " + str(response.status_code)
     
@@ -205,29 +204,24 @@ def set_status_to_sent(sysid):
     """
     This function sets status to sent
     """
-    commandsUrl = settings.url + 'api/bdml/parse_switch_json/CommandSent'
+    commandsUrl = "https://bynetprod.service-now.com/api/bdml/switch" + "/SetCommandStatus"
     if (sysid != None):
         myparams = {"sysid": str(sysid)}
-    if settings.debug_level > 1:
-        print("getting commands from snow: sysid:" + str(sysid))
+    print("getting commands from snow: sysid:" + str(sysid))
 
-    response = requests.get(commandsUrl, headers={
-                            'Content-Type': 'application/json'}, params=myparams, auth=(settings.username, settings.password))
+    response = requests.get(commandsUrl, headers={'Content-Type': 'application/json'}, params=myparams, auth=(switch_user, switch_password))
     msg = "status is: " + str(response.status_code)
-    if settings.debug_level > 1:
-        print(msg)
-        print(response.json())
+    print(msg)
+    print(response.json())
 
 
-#waiting to oz for switch
 def send_commands_to_switch(ip, command):
     """
     This function sends commands to the switch
     """
    # get switch username and password from snow
-    commandsUrl = settings.url + 'api/bdml/parse_switch_json/SwitchIPs'
-    response = requests.get(commandsUrl, headers={
-                            'Content-Type': 'application/json'}, auth=(settings.username, settings.password))
+    commandsUrl = "https://bynetprod.service-now.com/api/bdml/parse_switch_json/SwitchIPs"
+    response = requests.get(commandsUrl, headers={'Content-Type': 'application/json'}, auth=(switch_user, switch_password))
     myresponse = response.json()
     ips = myresponse["result"]["ips"]
     for myip in ips:
@@ -247,32 +241,19 @@ def send_commands_to_switch(ip, command):
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     else:
         ssh = sshClient
-    # login and run commands to get configuration
-    #output = run_command_on_device_wo_close(ip, switches_username, switches_password, "enable", ssh)
-    #if settings.debug_level > 5: print(output)
-    #output = run_command_on_device_wo_close(ip, switches_username, switches_password, enable_password, ssh)
-    #if settings.debug_level > 5: print(output)
-    output = run_command_on_device_wo_close(
-        ip, settings.switches_username, settings.switches_password, "terminal length 0", ssh)
-    if settings.debug_level > 5:
-        print(output)
-    output = run_command_on_device_wo_close(
-        ip, settings.switches_username, settings.switches_password, "conf t", ssh)
-    if settings.debug_level > 5:
-        print(output)
+    output = run_command_and_get_json(ip, settings.switches_username, settings.switches_password, "terminal length 0", ssh)
+    print(output)
+    output = run_command_and_get_json(ip, settings.switches_username, settings.switches_password, "conf t", ssh)
+    print(output)
     commands = command.split(",")
     for mycommand in commands:
         print("sending command: " + mycommand)
-        output = run_command_on_device_wo_close(
-            ip, settings.switches_username, settings.switches_password, mycommand, ssh)
+        output = run_command_and_get_json(ip, settings.switches_username, settings.switches_password, mycommand, ssh)
         if settings.debug_level > 5:
             print(output)
-    output = run_command_on_device_wo_close(
-        ip, settings.switches_username, settings.switches_password, "end", ssh)
-    output = run_command_on_device_wo_close(
-        ip, settings.switches_username, settings.switches_password, "write", ssh)
-    if settings.debug_level > 5:
-        print(output)
+    output = run_command_and_get_json(ip, settings.switches_username, settings.switches_password, "end", ssh)
+    output = run_command_and_get_json(ip, settings.switches_username, settings.switches_password, "write", ssh)
+    print(output)
     # Close connection.
     ssh.close()
 
@@ -290,8 +271,7 @@ def get_interfaces_mode(ip_address, username, password, interfaces, sshClient=No
     interfaces_mode = []
     for interface in interfaces:
         command = "show int " + interface + " switchport | include Administrative Mode:"
-        response = run_command_on_device_wo_close(ip_address, username, password,
-                                                  command, sshClient)[0]
+        response = run_command_and_get_json(ip_address, username, password,command, sshClient)[0]
         interface_mode = str(response.replace("\n", "").replace("\r", "").replace("Administrative Mode: ", ""))
         interface_mode = {
             'interface': interface,
@@ -301,7 +281,7 @@ def get_interfaces_mode(ip_address, username, password, interfaces, sshClient=No
     return interfaces_mode
 
 def get_all_interfaces(ip_address, username, password, sshClient=None):
-    interfaces = run_command_on_device_wo_close(ip_address, username, password, 'show int switchport | include Name',
+    interfaces = run_command_and_get_json(ip_address, username, password, 'show int switchport | include Name',
                                            sshClient)
     for idx, interface in enumerate(interfaces):
         interfaces[idx] = interface.split()[1]
@@ -309,7 +289,7 @@ def get_all_interfaces(ip_address, username, password, sshClient=None):
 
 
 def check_vlan_exists(ip_address, username, password, vlan_id, sshClient=None):
-    response = run_command_on_device_wo_close(ip_address, username, password, f'show vlan id {vlan_id}', sshClient).decode()#[1]
+    response = run_command_and_get_json(ip_address, username, password, f'show vlan id {vlan_id}', sshClient).decode()
     print(response)
     if "not found in current VLAN database" in response:
         return False
