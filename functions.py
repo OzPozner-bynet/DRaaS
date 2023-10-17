@@ -4,6 +4,9 @@ from unittest import result
 import requests, json, re, os
 from datetime import datetime
 import paramiko, configparser, confparser
+from ntc_templates.parse import parse_output
+from netmiko import ConnectHandler
+import json
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -14,6 +17,35 @@ config.read('./config/parameters.ini')
 
 switch_user = "shapi"
 switch_password = "patish"
+
+class SSHClient:
+    def __init__(self, address, username, password):
+        print("Connecting to server on IP", str(address) + ".")
+        self.connection_params = {
+            'device_type': 'cisco_ios',
+            'ip': address,
+            'username': username,
+            'password': password,
+        }
+        self.connection = None
+
+    def connect(self):
+        self.connection = ConnectHandler(**self.connection_params)
+        self.connection.enable()
+
+    def close_connection(self):
+        if self.connection:
+            self.connection.disconnect()
+
+    def exec_command(self, command, use_textfsm=False, expect_string=None):
+        if self.connection:
+            if use_textfsm:
+                output = self.connection.send_command(command, use_textfsm=True, expect_string=expect_string)
+            else:
+                output = self.connection.send_command(command, expect_string=expect_string)
+            return output
+        else:
+            raise ValueError("SSH connection is not established.")
 
 class ssh_new:
     shell = None
@@ -45,41 +77,32 @@ class ssh_new:
         else:
             print("Shell not opened.")
 
+def run_command_and_get_json(ip_address, username, password, command):
+    # Create an instance of the SSHClient class
+    ssh_client = SSHClient(ip_address, username, password)
 
-def run_command_and_get_json(ip_address, username, password, command, sshClient=None):
-    """ Connect to a device, run a command, and return the output."""
-    ssh = None
-    if sshClient is None:
-        ssh = paramiko.SSHClient()
-        ssh.load_system_host_keys()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    else:
-        ssh = sshClient
+    try:
+        # Establish the SSH connection
+        ssh_client.connect()
 
-    total_attempts = 1
+        # Run the specified command
+        if 'show run' in command:
+            output = ssh_client.exec_command(command)
+            parsed_data = confparser.Dissector.from_file('ios.yaml').parse_str(output)
+            json_data = json.dumps(parsed_data, indent=4)
+        else:
+            output = ssh_client.exec_command(command, use_textfsm=True)
+            json_data = json.dumps(output, indent=2)
 
-    for attempt in range(total_attempts):
-        try:
-            ssh.connect(ip_address, username=username, password=password, look_for_keys=False)
-            # Run command.
-            ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(command)
-            # Read output from command.
-            output = ssh_stdout.read()
-            # Close connection.
-            if ssh.get_transport() is not None:
-                ssh.close()
-            #print(output)
-            #return output
+        return json_data
 
-        except Exception as error_message:
-            print(f"Unable to connect to {ip_address}: {error_message}")
+    except Exception as error_message:
+        print(f"Unable to connect: {error_message}")
+        return None
+    finally:
+        # Close the SSH connection when done
+        ssh_client.close_connection()
 
-    # Decode the bytes to a string
-    output_str = output.decode('utf-8')
-    parsed_data = confparser.Dissector.from_file('ios.yaml').parse_str(output_str)
-    json_data = json.dumps(parsed_data, indent=4)
-    print(json_data)
-    return json_data
 
 
 def set_switch_interface(ip_address,interface, ifaceStatus="enable"):
@@ -271,7 +294,7 @@ def get_interfaces_mode(ip_address, username, password, interfaces, sshClient=No
     return interfaces_mode
 
 
-def get_all_interfaces(ip_address, username, password, sshClient=None):
+def get_all_interfaces(ip_address, username, password):
     interfaces = run_command_and_get_json(ip_address, username, password, 'show int switchport | include Name',
                                            sshClient)
     for idx, interface in enumerate(interfaces):
@@ -279,8 +302,8 @@ def get_all_interfaces(ip_address, username, password, sshClient=None):
     return interfaces
 
 
-def check_vlan_exists(ip_address, username, password, vlan_id, sshClient=None):
-    response = run_command_and_get_json(ip_address, username, password, f'show vlan id {vlan_id}', sshClient).decode()
+def check_vlan_exists(ip_address, username, password, vlan_id):
+    response = run_command_and_get_json(ip_address, username, password, f'show vlan id {vlan_id}')
     print(response)
     if "not found in current VLAN database" in response:
         return False
@@ -306,7 +329,6 @@ def check_privileged_connection(connection):
 
 
 def change_interface_mode(ip_address, username, password, interface, mode, vlan_id, enable_pass=None):
-#def change_interface_mode(ip_address, username, password, enable_pass=None, **kwargs):
     connection = ssh_new(ip_address, username, password)
     connection.open_shell()
     time.sleep(1)
@@ -318,38 +340,84 @@ def change_interface_mode(ip_address, username, password, interface, mode, vlan_
             connection.send_shell(enable_pass)
             time.sleep(1)
         else:
-            raise ValueError(f'enable_pass is missing and SSH connection is not privileged')
+            raise ValueError('enable_pass is missing, and SSH connection is not privileged')
 
     connection.send_shell('conf terminal')
     time.sleep(1)
     connection.send_shell(f'interface {interface}')
     time.sleep(1)
 
+    # Remove any existing configuration related to the opposite mode
     if mode == 'trunk':
+        connection.send_shell('no switchport access vlan')
+        connection.send_shell('no switchport mode access')
         connection.send_shell('switchport mode trunk')
-        print(f'interface {interface} mode changed to trunk')
-        time.sleep(1)
-        if vlan_id == None:
+        if vlan_id is None:
             connection.send_shell('switchport trunk encapsulation dot1q')
+            connection.send_shell('switchport trunk allowed vlan none')
         else:
+            connection.send_shell('switchport trunk encapsulation dot1q')
             if check_vlan_exists(ip_address, username, password, vlan_id) == False:
                 raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
             connection.send_shell(f'switchport trunk allowed vlan {vlan_id}')
-            answer = f'interface {interface} mode changed to trunk'
-    elif mode == 'access':
-        connection.send_shell('switchport mode access')
-        print(f'Interface {interface} mode changed to access')
-        answer = f'Interface {interface} mode changed to access'
-        if vlan_id != None:
+        print(f'Interface {interface} mode changed to trunk')
+    if mode == 'access':
+        connection.send_shell('no switchport trunk encapsulation dot1q')
+        connection.send_shell('no switchport mode trunk')
+        if vlan_id is not None:
             if check_vlan_exists(ip_address, username, password, vlan_id) == False:
                 raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
-            print("test")
-
             connection.send_shell(f'switchport access vlan {vlan_id}')
+            print(f'Interface {interface} mode changed to access')
             print(f'Interface {interface} added to VLAN {vlan_id}')
-            answer += f'\nInterface {interface} added to VLAN {vlan_id}'
+        connection.send_shell('no switchport trunk allowed vlan')  # Remove trunk allowed VLANs
+
     time.sleep(1)
     connection.close_connection()
 
-    return answer
 
+
+
+
+# def get_interface_vlan_info(ip_address, username, password, interface):
+#     ssh_client = SSHClient(ip_address, username, password)
+#     try:
+#         ssh_client.connect()
+#         command = f"show interface {interface} switchport"
+#         response = run_command_and_get_json(ip_address, username, password, command, ssh_client)
+#         print(response)
+
+
+
+#         if response:
+#             interface_info = response[0]
+#             # Extract VLAN information from the response
+#             vlan_info = {
+#                 'interface': interface,
+#                 'mode': None,
+#                 'allowed_vlans': [],
+#             }
+
+#             # Parse the response to extract mode and allowed VLANs
+#             for line in interface_info.splitlines():
+#                 if "Administrative Mode" in line:
+#                     vlan_info['mode'] = line.split(":")[1].strip()
+#                 elif "Operational Mode" in line:
+#                     if "trunk" in line:
+#                         vlan_info['mode'] = "trunk"
+
+#                 if "Vlans in spanning tree forwarding state and not pruned" in line:
+#                     vlans = line.split(":")[1].strip().split(", ")
+#                     vlan_info['allowed_vlans'] = vlans
+
+#             return vlan_info
+
+#         return None
+
+#     except Exception as error_message:
+#         print(f"Unable to connect: {error_message}")
+#         return None
+
+#     finally:
+#         # Close the SSH connection when done
+#         ssh_client.close_connection()

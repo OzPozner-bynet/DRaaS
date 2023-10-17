@@ -11,8 +11,11 @@ switch_info_url = "https://bynetprod.service-now.com/api/bdml/parse_switch_json/
 get_cmds_url = snow_url+"/getCommands"
 update_req_url = snow_url+"/SetCommandStatus"
 
-def redis_set(KEY="",VALUE="",OUTPUT=""):
-    OUTPUT = re.sub("\"","\\\"","      ".join(OUTPUT.splitlines()))
+def redis_set(KEY="", VALUE="", OUTPUT=""):
+    if OUTPUT:
+        OUTPUT = re.sub("\"", "\\\"", "      ".join(OUTPUT.splitlines()))
+    else:
+        OUTPUT = ""  # Handle the case where OUTPUT is None or empty
     redis_server.set(name=KEY, value=f'{{ "status": "{VALUE}", "output": "{OUTPUT}" }}')
     print(redis_server.get(KEY))
 
@@ -42,7 +45,9 @@ if __name__ == "__main__":
             fix_quotes = re.sub("'", "\"", next_req)
             no_none = re.sub("None", "\"\"", fix_quotes)
             json_req = json.loads(no_none)
+            print (json_req)
 
+            
             req_id = json_req["record_id"]
             req_vlans = json_req["vlans"]
             req_switch = "2aa1ebb587571d905db3db1cbbbb359d" # json_req["switch"]
@@ -70,7 +75,7 @@ if __name__ == "__main__":
                 try:
                     if req_cmd != "" and req_port_mode == "":
                         if req_interface_name != "":
-                            output = run_command_and_get_json(req_switch_ip, switch_user, switch_password, req_cmd+" "+req_interface_name)
+                            output = run_command_and_get_json(req_switch_ip, switch_user, switch_password, req_cmd)
                         else:
                             output = run_command_and_get_json(req_switch_ip, switch_user, switch_password, req_cmd)
                     else:

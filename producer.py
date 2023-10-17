@@ -31,7 +31,7 @@ def redis_queue_push(TASKS):
     for TASK in TASKS:
         if bool(re.search('(active|failed)', TASK["dr_status"])):
             kv_status = redis_server.get(TASK["record_id"])
-            if kv_status != None:
+            if kv_status is not None:
                 kv_status = json.loads(kv_status.decode())
                 if "completed" in kv_status["status"]:
                     output = re.sub("      ", "\n", kv_status["output"])

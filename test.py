@@ -16,7 +16,7 @@ update_req_url = snow_url+"/SetCommandStatus"
 switch_user = "shapi"
 switch_password = "patish"
 req_switch_ip = "172.31.78.200"
-req_interface_name = "Gi0/9"
+req_interface_name = "Gi0/13"
 
 # Set proper headers
 #headers = {"Accept":"application/json",'Content-type':'application/json'}
@@ -26,9 +26,14 @@ req_interface_name = "Gi0/9"
 
 #output = run_command_on_device_wo_close(req_switch_ip, switch_user , switch_password, "terminal length 0", None)
 
-json_data = run_command_and_get_json(req_switch_ip , switch_user, switch_password, (run_command_on_device_wo_close(req_switch_ip, switch_user, switch_password, "SHOW RUN")))
-print(json_data)
-# Print the JSON data
+# output = run_command_and_get_json(req_switch_ip, switch_user, switch_password, "show run")
+# print(output)
+
+#print(run_command_and_get_json(req_switch_ip, switch_user, switch_password, "show running-config"))S
+
+
+change_interface_mode(req_switch_ip, switch_user, switch_password, req_interface_name, 'trunk', "61")
+#print(get_interface_vlan_info(req_switch_ip, switch_user, switch_password,req_interface_name))
 
 
 #change_interface_mode(ip_address, "shapi", "patish", None, "interface="+interface, "status=disable")
