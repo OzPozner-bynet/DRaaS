@@ -29,10 +29,13 @@ req_interface_name = "Gi0/13"
 # output = run_command_and_get_json(req_switch_ip, switch_user, switch_password, "show run")
 # print(output)
 
-#print(run_command_and_get_json(req_switch_ip, switch_user, switch_password, "show running-config"))S
+output=(run_command_and_get_json(req_switch_ip, switch_user, switch_password, "show running-config"))
+status_message = "status: success"
+output = f"{status_message} {output}"
+print(output)
 
 
-change_interface_mode(req_switch_ip, switch_user, switch_password, req_interface_name, 'trunk', "61")
+#change_interface_mode(req_switch_ip, switch_user, switch_password, req_interface_name, 'trunk', "61")
 #print(get_interface_vlan_info(req_switch_ip, switch_user, switch_password,req_interface_name))
 
 

@@ -81,8 +81,12 @@ if __name__ == "__main__":
                     else:
                         output = change_interface_mode(req_switch_ip, switch_user, switch_password, req_interface_name, req_port_mode, req_vlans)
                 except Exception as error:
+                    status_message = "status: failed"
+                    output = f"{status_message} {error}"
                     send_status_update(req_id, "failed", error)
                 else:
+                    status_message = "status: success"
+                    output = f"{status_message} {output}"
                     redis_set(req_id, "completed", output)
                     task_sts = json.loads(redis_server.get(req_id).decode())["status"]
                     send_status_update(req_id, task_sts, output)

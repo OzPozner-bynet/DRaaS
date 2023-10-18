@@ -375,10 +375,6 @@ def change_interface_mode(ip_address, username, password, interface, mode, vlan_
     time.sleep(1)
     connection.close_connection()
 
-
-
-
-
 # def get_interface_vlan_info(ip_address, username, password, interface):
 #     ssh_client = SSHClient(ip_address, username, password)
 #     try:
