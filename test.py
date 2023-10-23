@@ -15,7 +15,7 @@ update_req_url = snow_url+"/SetCommandStatus"
 # Eg. User name="username", Password="password" for this code sample.
 switch_user = "shapi"
 switch_password = "patish"
-req_switch_ip = "172.31.78.200"
+req_switch_ip = "172.31.78.150"
 req_interface_name = "Gi0/13"
 
 # Set proper headers
@@ -26,17 +26,6 @@ req_interface_name = "Gi0/13"
 
 #output = run_command_on_device_wo_close(req_switch_ip, switch_user , switch_password, "terminal length 0", None)
 
-# output = run_command_and_get_json(req_switch_ip, switch_user, switch_password, "show run")
-# print(output)
-
-output=(run_command_and_get_json(req_switch_ip, switch_user, switch_password, "show running-config"))
-status_message = "status: success"
-output = f"{status_message} {output}"
-print(output)
+print (run_command_and_get_json(req_switch_ip, switch_user, switch_password, "show running-config"))
 
 
-#change_interface_mode(req_switch_ip, switch_user, switch_password, req_interface_name, 'trunk', "61")
-#print(get_interface_vlan_info(req_switch_ip, switch_user, switch_password,req_interface_name))
-
-
-#change_interface_mode(ip_address, "shapi", "patish", None, "interface="+interface, "status=disable")
