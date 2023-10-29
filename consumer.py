@@ -4,6 +4,7 @@ from time import sleep, time
 from functions import run_command_and_get_json
 from functions import change_interface_mode
 from functions import check_vlan_exists
+import glv
 
 redis_server = redis.Redis()
 queue_name = "api_req_queue"
@@ -53,7 +54,7 @@ def get_credentials(ip):
     return None, None
 
 def main():
-    added_vlan = None  # Initialize added_vlan outside the loop
+    glv.added_vlan  # Declare that we are using the global variable
     while True:
         q_len = redis_server.llen(queue_name)
         print(f'Queue length: {q_len}')
@@ -115,9 +116,9 @@ def main():
                                 else:
                                     output = change_interface_mode(req_switch_ip, retrieved_user, retrieved_password, req_interface_name, req_port_mode, req_vlans)
 
-                                if added_vlan is not None:  # Check if a VLAN was added
-                                    output_message = f'{added_vlan} was missing, creating...'
-                                    added_vlan = None  # Reset it after displaying the message
+                                if glv.added_vlan is not None:  # Check if a VLAN was added
+                                    output_message = f'vlan{glv.added_vlan} was missing, creating...'
+                                    glv.added_vlan = None  # Reset it after displaying the message
                                 else:
                                     output_message = ""
 
@@ -150,9 +151,9 @@ def main():
                             else:
                                 output = change_interface_mode(req_switch_ip, retrieved_user, retrieved_password, req_interface_name, req_port_mode, req_vlans)
 
-                            if added_vlan is not None:  # Check if a VLAN was added
-                                output_message = f'{added_vlan} was missing, creating...'
-                                added_vlan = None  # Reset it after displaying the message
+                            if glv.added_vlan is not None:  # Check if a VLAN was added
+                                output_message = f'vlan{glv.added_vlan} was missing, creating...'
+                                glv.added_vlan = None  # Reset it after displaying the message
                             else:
                                 output_message = ""
 

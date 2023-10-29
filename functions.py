@@ -9,12 +9,12 @@ from netmiko import ConnectHandler
 import json
 from dotenv import load_dotenv
 from socket import *
+import glv
 load_dotenv()
 
 config = configparser.ConfigParser()
 config.sections()
 config.read('./config/parameters.ini')
-
 
 class SSHClient:
     def __init__(self, address, username, password):
@@ -98,8 +98,6 @@ def run_command_and_get_json(ip_address, username, password, command):
     finally:
         # Close the SSH connection when done
         ssh_client.close_connection()
-
-
 
 def set_switch_interface(ip_address,interface, ifaceStatus="enable"):
     """
@@ -268,13 +266,11 @@ def send_commands_to_switch(ip, command):
     # Close connection.
     ssh.close()
 
-
 def today():
     now = datetime.now()
     date_time = now.strftime("_%m-%d-%Y-H-%H_")
     #date_time = "fix"
     return (date_time)
-
 
 def get_interfaces_mode(ip_address, username, password, interfaces, sshClient=None):
     interfaces_mode = []
@@ -288,7 +284,6 @@ def get_interfaces_mode(ip_address, username, password, interfaces, sshClient=No
         }
         interfaces_mode.append(interface_mode)
     return interfaces_mode
-
 
 def check_privileged_connection(connection):
     buffer_size = 4096
@@ -313,17 +308,14 @@ def get_all_interfaces(ip_address, username, password):
         interfaces[idx] = interface.split()[1]
     return interfaces
 
-
 def check_vlan_exists(ip_address, username, password, vlan_id):
-    global added_vlan  # Declare the global variable
-
     response = run_command_and_get_json(ip_address, username, password, f'show vlan id {vlan_id}')
     if "not found in current VLAN database" in response:
         print(f"VLAN {vlan_id} not found. Creating the VLAN...")
         create_vlan_command = f'vlan {vlan_id}'
         run_command_and_get_json(ip_address, username, password, create_vlan_command)
         print(f"VLAN {vlan_id} created.")
-        added_vlan = vlan_id  # Assign the value to the global variable
+        glv.added_vlan = vlan_id  # Assign the value to the global variable
         return True
     else:
         print(f"VLAN {vlan_id} already exists.")
