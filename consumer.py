@@ -20,7 +20,7 @@ def redis_set(KEY="", VALUE="", OUTPUT=""):
     else:
         OUTPUT = ""  # Handle the case where OUTPUT is None or empty
     redis_server.set(name=KEY, value=f'{{ "status": "{VALUE}", "output": "{OUTPUT}" }}')
-    print(redis_server.get(KEY))
+    #print(redis_server.get(KEY))
 
 def redis_queue_get():
     req = redis_server.lpop(queue_name).decode()
@@ -83,10 +83,7 @@ def main():
             if "active" in str(task_sts):
                 switch_user = None
                 switch_password = None
-                switch_details = requests.get(switch_info_url, data=f"{{ 'switch_id': '{req_switch}' }}",
-                                              headers={'Content-Type': 'application/json'},
-                                              auth=('admin', 'Danut24680')).json()
-                print(switch_details)
+                switch_details = requests.get(switch_info_url, data=f"{{ 'switch_id': '{req_switch}' }}",headers={'Content-Type': 'application/json'},auth=('admin', 'Danut24680')).json()
 
                 for i in range(len(switch_details['result'])):
                     if (switch_details['result'][i]['ip'] == req_switch_ip):

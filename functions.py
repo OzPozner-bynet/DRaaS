@@ -51,34 +51,23 @@ class ssh_new:
     transport = None
 
     def __init__(self, address, username, password):
+        print("Connecting to server on ip", str(address) + ".")
         self.client = paramiko.SSHClient()
         self.client.set_missing_host_key_policy(paramiko.client.AutoAddPolicy())
-        self.address = address
-        self.username = username
-        self.password = password
-
-    def connect(self):
-        self.client.connect(self.address, username=self.username, password=self.password, look_for_keys=False)
+        self.client.connect(address, username=username, password=password, look_for_keys=False)
 
     def close_connection(self):
         if(self.client != None):
             self.client.close()
 
     def open_shell(self):
-        self.client.connect(self.address, username=self.username, password=self.password, look_for_keys=False)
         self.shell = self.client.invoke_shell()
 
-    def exec_command(self, command, use_textfsm=False, expect_string=None):
-        if self.client:
-            if use_textfsm:
-                output = self.connection.send_command(command, use_textfsm=True, expect_string=expect_string)
-                return output
-            else:
-                _, ssh_stdout, ssh_stderr = self.client.exec_command(command)
-                err = ssh_stderr.readlines()
-                return err if err else ssh_stdout.readlines()
-        else:
-            raise ValueError("SSH connection is not established.")
+
+    def exec_command(self, command):
+        _, ssh_stdout, ssh_stderr = self.client.exec_command(command)
+        err = ssh_stderr.readlines()
+        return err if err else ssh_stdout.readlines()
 
     def send_shell(self, command):
         if(self.shell):
@@ -88,7 +77,7 @@ class ssh_new:
 
 def run_command_and_get_json(ip_address, username, password, command):
     # Create an instance of the SSHClient class
-    ssh_client = ssh_new(ip_address, username, password)
+    ssh_client = SSHClient(ip_address, username, password)
     try:
         # Establish the SSH connection
         ssh_client.connect()
@@ -347,6 +336,7 @@ def change_interface_mode(ip_address, username, password, interface, mode, vlan_
         connection.open_shell()
         time.sleep(1)
 
+
         if not check_privileged_connection(connection):
             if enable_pass is not None:
                 connection.send_shell('enable')
@@ -371,15 +361,15 @@ def change_interface_mode(ip_address, username, password, interface, mode, vlan_
                 connection.send_shell('switchport trunk allowed vlan none')
             else:
                 connection.send_shell('switchport trunk encapsulation dot1q')
-                if not check_vlan_exists(ip_address, username, password, vlan_id):
+                if check_vlan_exists(ip_address, username, password, vlan_id) == False:
                     raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
                 connection.send_shell(f'switchport trunk allowed vlan {vlan_id}')
             print(f'Interface {interface} mode changed to trunk')
-        elif mode == 'access':
+        if mode == 'access':
             connection.send_shell('no switchport trunk encapsulation dot1q')
             connection.send_shell('no switchport mode trunk')
             if vlan_id is not None:
-                if not check_vlan_exists(ip_address, username, password, vlan_id):
+                if check_vlan_exists(ip_address, username, password, vlan_id) == False:
                     raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
                 connection.send_shell(f'switchport access vlan {vlan_id}')
                 print(f'Interface {interface} mode changed to access')
