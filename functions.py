@@ -291,38 +291,6 @@ def get_interfaces_mode(ip_address, username, password, interfaces, sshClient=No
     return interfaces_mode
 
 
-def get_all_interfaces(ip_address, username, password):
-    interfaces = run_command_and_get_json(ip_address, username, password, 'show int switchport | include Name',ssh_new)
-    for idx, interface in enumerate(interfaces):
-        interfaces[idx] = interface.split()[1]
-    return interfaces
-
-def check_vlan_exists(ip_address, username, password, vlan_id):
-    response = run_command_and_get_json(ip_address, username, password, f'show vlan id {vlan_id}')
-    print(response)
-    if "not found in current VLAN database" in response:
-        print(f"VLAN {vlan_id} not found. Creating the VLAN...")
-        create_vlan_command = f'vlan {vlan_id}'
-        run_command_and_get_json(ip_address, username, password, create_vlan_command)
-        print(f"VLAN {vlan_id} created.")
-        return True
-    return True  # The VLAN exists
-
-
-def check_vlan_exists(ip_address, username, password, vlan_id):
-    response = run_command_and_get_json(ip_address, username, password, f'show vlan id {vlan_id}')
-    print(response)
-    if "not found in current VLAN database" in response:
-        print(f"VLAN {vlan_id} not found. Creating the VLAN...")
-        create_vlan_command = f'vlan {vlan_id}'
-        run_command_and_get_json(ip_address, username, password, create_vlan_command)
-        print(f"VLAN {vlan_id} created.")
-        return True
-    else:
-        print(f"VLAN {vlan_id} already exists.")
-        return True  # The VLAN exists
-
-
 def check_privileged_connection(connection):
     buffer_size = 4096
     def flush(connection):
@@ -339,6 +307,29 @@ def check_privileged_connection(connection):
         return data
     prompt = get_prompt(connection)
     return True if prompt[-1] == '#' else False
+
+
+def get_all_interfaces(ip_address, username, password):
+    interfaces = run_command_and_get_json(ip_address, username, password, 'show int switchport | include Name',ssh_new)
+    for idx, interface in enumerate(interfaces):
+        interfaces[idx] = interface.split()[1]
+    return interfaces
+
+
+def check_vlan_exists(ip_address, username, password, vlan_id):
+    global added_vlan  # Declare the global variable
+
+    response = run_command_and_get_json(ip_address, username, password, f'show vlan id {vlan_id}')
+    if "not found in current VLAN database" in response:
+        print(f"VLAN {vlan_id} not found. Creating the VLAN...")
+        create_vlan_command = f'vlan {vlan_id}'
+        run_command_and_get_json(ip_address, username, password, create_vlan_command)
+        print(f"VLAN {vlan_id} created.")
+        added_vlan = vlan_id  # Assign the value to the global variable
+        return True
+    else:
+        print(f"VLAN {vlan_id} already exists.")
+        return True  # The VLAN exists
 
 
 def change_interface_mode(ip_address, username, password, interface, mode, vlan_id, enable_pass=None):
