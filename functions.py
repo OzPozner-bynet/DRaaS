@@ -8,14 +8,13 @@ from ntc_templates.parse import parse_output
 from netmiko import ConnectHandler
 import json
 from dotenv import load_dotenv
+from socket import *
 load_dotenv()
 
 config = configparser.ConfigParser()
 config.sections()
 config.read('./config/parameters.ini')
 
-switch_user = "shapi"
-switch_password = "patish"
 
 class SSHClient:
     def __init__(self, address, username, password):
@@ -52,23 +51,34 @@ class ssh_new:
     transport = None
 
     def __init__(self, address, username, password):
-        print("Connecting to server on ip", str(address) + ".")
         self.client = paramiko.SSHClient()
         self.client.set_missing_host_key_policy(paramiko.client.AutoAddPolicy())
-        self.client.connect(address, username=username, password=password, look_for_keys=False)
+        self.address = address
+        self.username = username
+        self.password = password
+
+    def connect(self):
+        self.client.connect(self.address, username=self.username, password=self.password, look_for_keys=False)
 
     def close_connection(self):
         if(self.client != None):
             self.client.close()
 
     def open_shell(self):
+        self.client.connect(self.address, username=self.username, password=self.password, look_for_keys=False)
         self.shell = self.client.invoke_shell()
 
-
-    def exec_command(self, command):
-        _, ssh_stdout, ssh_stderr = self.client.exec_command(command)
-        err = ssh_stderr.readlines()
-        return err if err else ssh_stdout.readlines()
+    def exec_command(self, command, use_textfsm=False, expect_string=None):
+        if self.client:
+            if use_textfsm:
+                output = self.connection.send_command(command, use_textfsm=True, expect_string=expect_string)
+                return output
+            else:
+                _, ssh_stdout, ssh_stderr = self.client.exec_command(command)
+                err = ssh_stderr.readlines()
+                return err if err else ssh_stdout.readlines()
+        else:
+            raise ValueError("SSH connection is not established.")
 
     def send_shell(self, command):
         if(self.shell):
@@ -78,7 +88,7 @@ class ssh_new:
 
 def run_command_and_get_json(ip_address, username, password, command):
     # Create an instance of the SSHClient class
-    ssh_client = SSHClient(ip_address, username, password)
+    ssh_client = ssh_new(ip_address, username, password)
     try:
         # Establish the SSH connection
         ssh_client.connect()
@@ -92,10 +102,10 @@ def run_command_and_get_json(ip_address, username, password, command):
 
         return json_data
 
-    except Exception as error_message:
-        print(f"Unable to connect: {error_message}")
-        return None
-    
+    except (paramiko.AuthenticationException, paramiko.SSHException) as error:
+        # Raise an exception if there is an error during the connection
+        raise error
+
     finally:
         # Close the SSH connection when done
         ssh_client.close_connection()
@@ -308,7 +318,6 @@ def check_privileged_connection(connection):
     prompt = get_prompt(connection)
     return True if prompt[-1] == '#' else False
 
-
 def get_all_interfaces(ip_address, username, password):
     interfaces = run_command_and_get_json(ip_address, username, password, 'show int switchport | include Name',ssh_new)
     for idx, interface in enumerate(interfaces):
@@ -334,47 +343,52 @@ def check_vlan_exists(ip_address, username, password, vlan_id):
 
 def change_interface_mode(ip_address, username, password, interface, mode, vlan_id, enable_pass=None):
     connection = ssh_new(ip_address, username, password)
-    connection.open_shell()
-    time.sleep(1)
+    try:
+        connection.open_shell()
+        time.sleep(1)
 
-    if not check_privileged_connection(connection):
-        if enable_pass is not None:
-            connection.send_shell('enable')
-            time.sleep(1)
-            connection.send_shell(enable_pass)
-            time.sleep(1)
-        else:
-            raise ValueError('enable_pass is missing, and SSH connection is not privileged')
+        if not check_privileged_connection(connection):
+            if enable_pass is not None:
+                connection.send_shell('enable')
+                time.sleep(1)
+                connection.send_shell(enable_pass)
+                time.sleep(1)
+            else:
+                raise ValueError('enable_pass is missing, and SSH connection is not privileged')
 
-    connection.send_shell('conf terminal')
-    time.sleep(1)
-    connection.send_shell(f'interface {interface}')
-    time.sleep(1)
+        connection.send_shell('conf terminal')
+        time.sleep(1)
+        connection.send_shell(f'interface {interface}')
+        time.sleep(1)
 
-    # Remove any existing configuration related to the opposite mode
-    if mode == 'trunk':
-        connection.send_shell('no switchport access vlan')
-        connection.send_shell('no switchport mode access')
-        connection.send_shell('switchport mode trunk')
-        if vlan_id is None:
-            connection.send_shell('switchport trunk encapsulation dot1q')
-            connection.send_shell('switchport trunk allowed vlan none')
-        else:
-            connection.send_shell('switchport trunk encapsulation dot1q')
-            if check_vlan_exists(ip_address, username, password, vlan_id) == False:
-                raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
-            connection.send_shell(f'switchport trunk allowed vlan {vlan_id}')
-        print(f'Interface {interface} mode changed to trunk')
-    if mode == 'access':
-        connection.send_shell('no switchport trunk encapsulation dot1q')
-        connection.send_shell('no switchport mode trunk')
-        if vlan_id is not None:
-            if check_vlan_exists(ip_address, username, password, vlan_id) == False:
-                raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
-            connection.send_shell(f'switchport access vlan {vlan_id}')
-            print(f'Interface {interface} mode changed to access')
-            print(f'Interface {interface} added to VLAN {vlan_id}')
-        connection.send_shell('no switchport trunk allowed vlan')  # Remove trunk allowed VLANs
+        # Remove any existing configuration related to the opposite mode
+        if mode == 'trunk':
+            connection.send_shell('no switchport access vlan')
+            connection.send_shell('no switchport mode access')
+            connection.send_shell('switchport mode trunk')
+            if vlan_id is None:
+                connection.send_shell('switchport trunk encapsulation dot1q')
+                connection.send_shell('switchport trunk allowed vlan none')
+            else:
+                connection.send_shell('switchport trunk encapsulation dot1q')
+                if not check_vlan_exists(ip_address, username, password, vlan_id):
+                    raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
+                connection.send_shell(f'switchport trunk allowed vlan {vlan_id}')
+            print(f'Interface {interface} mode changed to trunk')
+        elif mode == 'access':
+            connection.send_shell('no switchport trunk encapsulation dot1q')
+            connection.send_shell('no switchport mode trunk')
+            if vlan_id is not None:
+                if not check_vlan_exists(ip_address, username, password, vlan_id):
+                    raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
+                connection.send_shell(f'switchport access vlan {vlan_id}')
+                print(f'Interface {interface} mode changed to access')
+                print(f'Interface {interface} added to VLAN {vlan_id}')
+            connection.send_shell('no switchport trunk allowed vlan')  # Remove trunk allowed VLANs
 
-    time.sleep(1)
-    connection.close_connection()
+        time.sleep(1)
+        connection.close_connection()
+
+    except (paramiko.AuthenticationException, paramiko.SSHException) as error:
+        # Raise an exception if there is an error during the connection
+        raise error
