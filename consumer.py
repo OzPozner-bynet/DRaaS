@@ -5,6 +5,7 @@ from functions import run_command_and_get_json
 from functions import change_interface_mode
 from functions import check_vlan_exists
 import glv
+from glv import added_vlan
 
 redis_server = redis.Redis()
 queue_name = "api_req_queue"
@@ -117,7 +118,7 @@ def main():
                                     output = change_interface_mode(req_switch_ip, retrieved_user, retrieved_password, req_interface_name, req_port_mode, req_vlans)
 
                                 if glv.added_vlan is not None:  # Check if a VLAN was added
-                                    output_message = f'vlan{glv.added_vlan} was missing, creating...'
+                                    output_message = "Added VLANs: " + ", ".join(map(str, added_vlan))
                                     glv.added_vlan = None  # Reset it after displaying the message
                                 else:
                                     output_message = ""
@@ -152,7 +153,7 @@ def main():
                                 output = change_interface_mode(req_switch_ip, retrieved_user, retrieved_password, req_interface_name, req_port_mode, req_vlans)
 
                             if glv.added_vlan is not None:  # Check if a VLAN was added
-                                output_message = f'vlan{glv.added_vlan} was missing, creating...'
+                                output_message = "Added VLANs: " + ", ".join(map(str, added_vlan))
                                 glv.added_vlan = None  # Reset it after displaying the message
                             else:
                                 output_message = ""

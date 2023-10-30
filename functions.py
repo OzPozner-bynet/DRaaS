@@ -10,6 +10,7 @@ import json
 from dotenv import load_dotenv
 from socket import *
 import glv
+from glv import added_vlan  # Import the added_vlan list
 load_dotenv()
 
 config = configparser.ConfigParser()
@@ -315,7 +316,7 @@ def check_vlan_exists(ip_address, username, password, vlan_id):
         create_vlan_command = f'vlan {vlan_id}'
         run_command_and_get_json(ip_address, username, password, create_vlan_command)
         print(f"VLAN {vlan_id} created.")
-        glv.added_vlan = vlan_id  # Assign the value to the global variable
+        added_vlan.append(vlan_id)  # Append the VLAN ID to the list of added VLANs in glv
         return True
     else:
         print(f"VLAN {vlan_id} already exists.")
@@ -347,36 +348,35 @@ def change_interface_mode(ip_address, username, password, interface, mode, vlan_
             connection.send_shell('no switchport access vlan')
             connection.send_shell('no switchport mode access')
             connection.send_shell('switchport mode trunk')
-            if "-" in vlan_range:
-                start_vlan, end_vlan = map(int, vlan_range.split('-'))
-                for vlan_id in range(start_vlan, end_vlan + 1):
-                    if check_vlan_exists(ip_address, username, password, vlan_id) == False:
-                        raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
-                    connection.send_shell(f'switchport trunk allowed vlan {vlan_id}')
-                connection.send_shell(f'switchport trunk allowed vlan add {vlan_range}')
-                print(f'Interface {interface} mode changed to trunk, allowed VLANs: {vlan_range}')
-            elif vlan_range:
-                vlan_id = int(vlan_range)
+            
+            vlan_ids = []
+
+            for vlan_group in vlan_range.split(','):
+                if "-" in vlan_group:
+                    start_vlan, end_vlan = map(int, vlan_group.split('-'))
+                    vlan_ids.extend(range(start_vlan, end_vlan + 1))
+                else:
+                    vlan_ids.append(int(vlan_group))
+
+            for vlan_id in vlan_ids:
                 if check_vlan_exists(ip_address, username, password, vlan_id) == False:
                     raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
-                connection.send_shell(f'switchport trunk allowed vlan {vlan_id}')
-                print(f'Interface {interface} mode changed to trunk, allowed VLAN: {vlan_range}')
+                connection.send_shell(f'switchport trunk allowed vlan add {vlan_id}')
+            
+            print(f'Interface {interface} mode changed to trunk, allowed VLANs: {vlan_range}')
         elif mode == 'access':
             connection.send_shell('no switchport trunk encapsulation dot1q')
             connection.send_shell('no switchport mode trunk')
+            
             if "-" in vlan_range:
-                start_vlan, end_vlan = map(int, vlan_range.split('-'))
-                for vlan_id in range(start_vlan, end_vlan + 1):
-                    if check_vlan_exists(ip_address, username, password, vlan_id) == False:
-                        raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
-                    connection.send_shell(f'switchport access vlan {vlan_id}')
-                print(f'Interface {interface} mode changed to access, VLAN range: {vlan_range}')
+                raise ValueError("VLAN range is not supported in access mode")
             elif vlan_range:
                 vlan_id = int(vlan_range)
                 if check_vlan_exists(ip_address, username, password, vlan_id) == False:
                     raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
                 connection.send_shell(f'switchport access vlan {vlan_id}')
-                print(f'Interface {interface} mode changed to access, VLAN: {vlan_range}')
+            
+            print(f'Interface {interface} mode changed to access, VLAN: {vlan_range}')
             connection.send_shell('no switchport trunk allowed vlan')  # Remove trunk allowed VLANs
 
         time.sleep(1)
@@ -385,3 +385,4 @@ def change_interface_mode(ip_address, username, password, interface, mode, vlan_
     except (paramiko.AuthenticationException, paramiko.SSHException) as error:
         # Raise an exception if there is an error during the connection
         raise error
+

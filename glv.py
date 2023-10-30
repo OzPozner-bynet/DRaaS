@@ -1,1 +1,1 @@
-added_vlan=None
+added_vlan = []
