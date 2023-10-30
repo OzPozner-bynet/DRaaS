@@ -322,12 +322,11 @@ def check_vlan_exists(ip_address, username, password, vlan_id):
         return True  # The VLAN exists
 
 
-def change_interface_mode(ip_address, username, password, interface, mode, vlan_id, enable_pass=None):
+def change_interface_mode(ip_address, username, password, interface, mode, vlan_range, enable_pass=None):
     connection = ssh_new(ip_address, username, password)
     try:
         connection.open_shell()
         time.sleep(1)
-
 
         if not check_privileged_connection(connection):
             if enable_pass is not None:
@@ -348,24 +347,36 @@ def change_interface_mode(ip_address, username, password, interface, mode, vlan_
             connection.send_shell('no switchport access vlan')
             connection.send_shell('no switchport mode access')
             connection.send_shell('switchport mode trunk')
-            if vlan_id is None:
-                connection.send_shell('switchport trunk encapsulation dot1q')
-                connection.send_shell('switchport trunk allowed vlan none')
-            else:
-                connection.send_shell('switchport trunk encapsulation dot1q')
+            if "-" in vlan_range:
+                start_vlan, end_vlan = map(int, vlan_range.split('-'))
+                for vlan_id in range(start_vlan, end_vlan + 1):
+                    if check_vlan_exists(ip_address, username, password, vlan_id) == False:
+                        raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
+                    connection.send_shell(f'switchport trunk allowed vlan {vlan_id}')
+                connection.send_shell(f'switchport trunk allowed vlan add {vlan_range}')
+                print(f'Interface {interface} mode changed to trunk, allowed VLANs: {vlan_range}')
+            elif vlan_range:
+                vlan_id = int(vlan_range)
                 if check_vlan_exists(ip_address, username, password, vlan_id) == False:
                     raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
                 connection.send_shell(f'switchport trunk allowed vlan {vlan_id}')
-            print(f'Interface {interface} mode changed to trunk')
-        if mode == 'access':
+                print(f'Interface {interface} mode changed to trunk, allowed VLAN: {vlan_range}')
+        elif mode == 'access':
             connection.send_shell('no switchport trunk encapsulation dot1q')
             connection.send_shell('no switchport mode trunk')
-            if vlan_id is not None:
+            if "-" in vlan_range:
+                start_vlan, end_vlan = map(int, vlan_range.split('-'))
+                for vlan_id in range(start_vlan, end_vlan + 1):
+                    if check_vlan_exists(ip_address, username, password, vlan_id) == False:
+                        raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
+                    connection.send_shell(f'switchport access vlan {vlan_id}')
+                print(f'Interface {interface} mode changed to access, VLAN range: {vlan_range}')
+            elif vlan_range:
+                vlan_id = int(vlan_range)
                 if check_vlan_exists(ip_address, username, password, vlan_id) == False:
                     raise ValueError(f'VLAN {vlan_id} is missing in device configuration')
                 connection.send_shell(f'switchport access vlan {vlan_id}')
-                print(f'Interface {interface} mode changed to access')
-                print(f'Interface {interface} added to VLAN {vlan_id}')
+                print(f'Interface {interface} mode changed to access, VLAN: {vlan_range}')
             connection.send_shell('no switchport trunk allowed vlan')  # Remove trunk allowed VLANs
 
         time.sleep(1)

@@ -106,7 +106,7 @@ def main():
                             credential_dict[req_switch_ip]["status"] == "failed"):
 
                         time_since_last_attempt = time() - credential_dict[req_switch_ip]["timestamp"]
-                        if time_since_last_attempt > 50:  # 300 seconds = 5 minutes
+                        if time_since_last_attempt > 300:  # 300 seconds = 5 minutes
                             try:
                                 if req_cmd != "" and req_port_mode == "":
                                     if req_interface_name != "":
