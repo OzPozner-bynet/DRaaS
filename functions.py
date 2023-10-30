@@ -98,7 +98,6 @@ def run_command_and_get_json(ip_address, username, password, command):
 
     finally:
         # Close the SSH connection when done
-        ssh_client.exec_command('write memory')
         ssh_client.close_connection()
 
 def set_switch_interface(ip_address,interface, ifaceStatus="enable"):
@@ -348,6 +347,7 @@ def change_interface_mode(ip_address, username, password, interface, mode, vlan_
         if mode == 'trunk':
             connection.send_shell('no switchport access vlan')
             connection.send_shell('no switchport mode access')
+            connection.send_shell('switchport trunk encapsulation dot1q')
             connection.send_shell('switchport mode trunk')
             
             vlan_ids = []
@@ -380,9 +380,10 @@ def change_interface_mode(ip_address, username, password, interface, mode, vlan_
             print(f'Interface {interface} mode changed to access, VLAN: {vlan_range}')
             connection.send_shell('no switchport trunk allowed vlan')  # Remove trunk allowed VLANs
         
-
-        connection.send_shell('write memory')
-        time.sleep(1)
+        connection.send_shell('exit')
+        connection.send_shell('exit')
+        connection.send_shell('write memory')  # Save the configuration to memory
+        time.sleep(10)  # Give it some time to save the configuration
         connection.close_connection()
 
     except (paramiko.AuthenticationException, paramiko.SSHException) as error:
