@@ -14,3 +14,6 @@ configparser
 confparser
 ntc-templates
 netmiko
+flask
+socket
+ntc_templates

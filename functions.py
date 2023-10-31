@@ -17,6 +17,7 @@ config = configparser.ConfigParser()
 config.sections()
 config.read('./config/parameters.ini')
 
+#SSH connection function
 class SSHClient:
     def __init__(self, address, username, password):
         print("Connecting to server on IP", str(address) + ".")
@@ -46,6 +47,7 @@ class SSHClient:
         else:
             raise ValueError("SSH connection is not established.")
 
+#SSH connection function
 class ssh_new:
     shell = None
     client = None
@@ -107,23 +109,6 @@ def set_switch_interface(ip_address,interface, ifaceStatus="enable"):
     print("sshing to: " + switch_user + "@" + ip_address)
     change_interface_mode(ip_address, "shapi", "patish", None, "interface="+interface, "status=disable")
 
-
-def send_json_to_snow(payload):
-    """
-    This function sends Payload(JSON file) to SNOW API
-    """
-    print("sending JSON to snow:\n" + str(payload))
-    response = requests.post(
-        settings.url + "api/bdml/parse_switch_json/DRaaS/ParseSwitch",
-        headers={'Content-Type': 'application/json'},
-        auth=(switch_user, switch_password),
-        json=payload
-    )
-    msg = "status is: " + str(response.status_code)
-    print(msg)
-    print(response.json())
-
-
 def get_commands_from_snow(hostname=None, ip=None):
     """
     This function gets commands from snow API
@@ -167,14 +152,12 @@ def get_commands_from_snow(hostname=None, ip=None):
     else:
         return 'bad response from snow code:' + str(response.status_code) + ' message: ' + str(myresponse)
 
-
 def is_json(myjson):
   try:
     json.loads(str(myjson))
   except ValueError as e:
     return False
   return True
-
 
 def get_ips_from_snow():
     """
@@ -209,7 +192,6 @@ def get_ips_from_snow():
     else:
         return 'bad response from SNOW code:' + str(response.status_code) + ' message: ' + str(is_json_response)
 
-
 def set_status_to_sent(sysid):
     """
     This function sets status to sent
@@ -223,55 +205,6 @@ def set_status_to_sent(sysid):
     msg = "status is: " + str(response.status_code)
     print(msg)
     print(response.json())
-
-
-def send_commands_to_switch(ip, command):
-    """
-    This function sends commands to the switch
-    """
-   # get switch username and password from snow
-    commandsUrl = "https://bynetprod.service-now.com/api/bdml/parse_switch_json/SwitchIPs"
-    response = requests.get(commandsUrl, headers={'Content-Type': 'application/json'}, auth=(switch_user, switch_password))
-    myresponse = response.json()
-    ips = myresponse["result"]["ips"]
-    for myip in ips:
-        if myip == ip:
-            switch_username = myresponse["result"]["username"]
-            switch_password = myresponse["result"]["password"]
-            if settings.debug_level > 0:
-                print("sendig command "+command+" to: " +
-                      settings.switches_username + "@" + ip)
-                print(switch_username)
-                print(switch_password)
-    sshClient = None
-    if sshClient == None:
-        ssh = paramiko.SSHClient()
-        ssh.load_system_host_keys()
-        # Add SSH host key when missing.
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    else:
-        ssh = sshClient
-    output = run_command_and_get_json(ip, settings.switches_username, settings.switches_password, "terminal length 0", ssh)
-    print(output)
-    output = run_command_and_get_json(ip, settings.switches_username, settings.switches_password, "conf t", ssh)
-    print(output)
-    commands = command.split(",")
-    for mycommand in commands:
-        print("sending command: " + mycommand)
-        output = run_command_and_get_json(ip, switch_username, settings.switches_password, mycommand, ssh)
-        if settings.debug_level > 5:
-            print(output)
-    output = run_command_and_get_json(ip, switch_username, settings.switches_password, "end", ssh)
-    output = run_command_and_get_json(ip, switch_username, settings.switches_password, "write", ssh)
-    print(output)
-    # Close connection.
-    ssh.close()
-
-def today():
-    now = datetime.now()
-    date_time = now.strftime("_%m-%d-%Y-H-%H_")
-    #date_time = "fix"
-    return (date_time)
 
 def get_interfaces_mode(ip_address, username, password, interfaces, sshClient=None):
     interfaces_mode = []
@@ -287,6 +220,9 @@ def get_interfaces_mode(ip_address, username, password, interfaces, sshClient=No
     return interfaces_mode
 
 def check_privileged_connection(connection):
+    """
+    Check if the SSH connection is privileged.
+    """
     buffer_size = 4096
     def flush(connection):
         while connection.shell.recv_ready():
@@ -322,8 +258,10 @@ def check_vlan_exists(ip_address, username, password, vlan_id):
         print(f"VLAN {vlan_id} already exists.")
         return True  # The VLAN exists
 
-
 def change_interface_mode(ip_address, username, password, interface, mode, vlan_range, enable_pass=None):
+    """
+    Change the mode of a network interface on a switch.
+    """
     connection = ssh_new(ip_address, username, password)
     try:
         connection.open_shell()
