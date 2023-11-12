@@ -1,8 +1,7 @@
 redis
 requests
-json
 python-dotenv
-time
+json
 threading
 unittest
 datetime
