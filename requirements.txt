@@ -1,13 +1,10 @@
 redis
 requests
-re
 json
-sys
 python-dotenv
 time
 threading
 unittest
-os
 datetime
 paramiko
 configparser
@@ -16,4 +13,3 @@ ntc-templates
 netmiko
 flask
 socket
-ntc_templates
