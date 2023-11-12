@@ -62,4 +62,3 @@ def init():
         print("username: ", username, "\n")
         print("password: ", password, "\n")
         print("Switches IP", ips, "\n")
-

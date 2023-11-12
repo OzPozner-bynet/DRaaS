@@ -1,0 +1,28 @@
+version: '3'
+services:
+  producer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - SCRIPT_NAME=producer.py
+    depends_on:
+      - redis
+    volumes:
+      - ./functions.py:/app/functions.py
+
+  consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - SCRIPT_NAME=consumer.py
+    depends_on:
+      - redis
+    volumes:
+      - ./functions.py:/app/functions.py
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"

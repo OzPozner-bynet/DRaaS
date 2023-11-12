@@ -1,0 +1,14 @@
+redis
+requests
+python-dotenv
+json
+threading
+unittest
+datetime
+paramiko
+configparser
+confparser
+ntc-templates
+netmiko
+flask
+socket
